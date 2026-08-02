@@ -1,0 +1,2871 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Bridiant Facility Group — Service Estimate</title>
+
+<!-- PWA / installable app metadata. Requires manifest.json, service-worker.js and /icons
+     to be uploaded to the SAME folder as this file on your web server. See the included
+     PWA_README.md for step-by-step hosting instructions. -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0B1F3A">
+<meta name="application-name" content="Bridiant Estimate">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bridiant Estimate">
+<meta name="msapplication-TileColor" content="#0B1F3A">
+<meta name="msapplication-TileImage" content="icons/mstile-150.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon-180.png">
+<link rel="apple-touch-icon" sizes="167x167" href="icons/apple-touch-icon-167.png">
+<link rel="apple-touch-icon" sizes="152x152" href="icons/apple-touch-icon-152.png">
+<link rel="apple-touch-icon" sizes="120x120" href="icons/apple-touch-icon-120.png">
+<link rel="apple-touch-startup-image" href="icons/splash-1242x2688.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/signature_pad/4.1.6/signature_pad.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{
+  --navy:#0B1F3A;
+  --navy-deep:#071527;
+  --white:#FFFFFF;
+
+  /* theme-aware tokens (light defaults) */
+  --bg:#F4F6F9;
+  --card:#FFFFFF;
+  --border:#E3E7EE;
+  --border-strong:#CBD3E0;
+  --text:#161F2C;
+  --muted:#6B7686;
+  --muted-2:#98A2B3;
+  --navy-tint:#EAF0F8;
+  --navy-tint-2:#DCE6F3;
+  --accent:#0B1F3A;
+  --accent-ink:#FFFFFF;
+
+  --ok:#2F8F5B;
+  --ok-tint:#E7F5EE;
+  --err:#C0392B;
+  --err-tint:#FBEAE8;
+  --radius-sm:8px;
+  --radius:14px;
+  --radius-lg:20px;
+  --shadow-sm:0 1px 2px rgba(11,31,58,0.06);
+  --shadow:0 8px 24px rgba(11,31,58,0.08);
+  --shadow-lg:0 24px 60px rgba(11,31,58,0.20);
+  --font-display:'Inter',sans-serif;
+  --font-body:'Inter',sans-serif;
+  color-scheme:light;
+}
+html[data-theme="dark"]{
+  --bg:#070E1A;
+  --card:#111B2C;
+  --border:#20304A;
+  --border-strong:#2C4066;
+  --text:#E8EDF5;
+  --muted:#93A1B8;
+  --muted-2:#5C6C87;
+  --navy-tint:rgba(111,168,255,0.12);
+  --navy-tint-2:rgba(111,168,255,0.2);
+  --accent:#6FA8FF;
+  --accent-ink:#071527;
+  --ok-tint:rgba(47,143,91,0.16);
+  --err-tint:rgba(192,57,43,0.16);
+  --shadow-sm:0 1px 2px rgba(0,0,0,0.3);
+  --shadow:0 8px 24px rgba(0,0,0,0.35);
+  --shadow-lg:0 24px 60px rgba(0,0,0,0.55);
+  color-scheme:dark;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0;
+  font-family:var(--font-body);
+  background:var(--bg);
+  color:var(--text);
+  -webkit-font-smoothing:antialiased;
+  transition:background .25s ease, color .25s ease;
+}
+::selection{background:var(--navy-tint-2);}
+button{font-family:inherit;cursor:pointer;}
+input,select,textarea{font-family:inherit;}
+a{color:inherit;}
+svg{display:block;}
+
+::-webkit-scrollbar{width:10px;height:10px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:10px;}
+
+/* ===== Top bar ===== */
+.topbar{
+  position:sticky;top:0;z-index:40;
+  background:var(--navy);
+  color:var(--white);
+  display:flex;align-items:center;gap:14px;
+  padding:11px 22px;
+  box-shadow:0 2px 16px rgba(0,0,0,0.18);
+}
+.brand-logo-slot{
+  width:42px;height:42px;border-radius:10px;
+  border:1.5px dashed rgba(255,255,255,0.35);
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;overflow:hidden;background:rgba(255,255,255,0.04);
+  color:rgba(255,255,255,0.45);
+  font-size:9.5px;text-align:center;line-height:1.15;
+  padding:2px;position:relative;
+}
+.brand-logo-slot img{width:100%;height:100%;object-fit:contain;}
+.brand-logo-slot.has-logo{border-style:solid;border-color:rgba(255,255,255,0.18);cursor:pointer;}
+.brand-logo-slot:not(.has-logo){cursor:pointer;}
+.brand-name{display:flex;flex-direction:column;line-height:1.2;margin-right:auto;}
+.brand-name b{font-family:var(--font-display);font-weight:700;font-size:14.5px;letter-spacing:0.1px;}
+.brand-name span{font-size:11px;color:rgba(255,255,255,0.6);}
+
+.topbar-actions{display:flex;align-items:center;gap:6px;}
+.tbtn{
+  display:flex;align-items:center;gap:6px;
+  padding:8px 13px;border-radius:9px;border:1px solid rgba(255,255,255,0.14);
+  background:rgba(255,255,255,0.05);color:var(--white);
+  font-size:12.5px;font-weight:500;
+  transition:background .15s ease, transform .1s ease, border-color .15s ease;
+  white-space:nowrap;
+}
+.tbtn:hover{background:rgba(255,255,255,0.14);border-color:rgba(255,255,255,0.28);}
+.tbtn:active{transform:scale(0.97);}
+.tbtn svg{width:15px;height:15px;flex-shrink:0;}
+.tbtn.primary{background:var(--white);color:var(--navy);border-color:var(--white);}
+.tbtn.primary:hover{background:#EFF3F8;}
+.tbtn.icon-only{padding:8px;}
+.tbtn-label{display:inline;}
+.tbtn.toggle-on{background:rgba(255,255,255,0.22);border-color:rgba(255,255,255,0.4);}
+
+.menu-wrap{position:relative;}
+.dropdown-menu{
+  position:absolute;top:calc(100% + 8px);right:0;
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  box-shadow:var(--shadow-lg);min-width:200px;padding:6px;z-index:60;
+  opacity:0;pointer-events:none;transform:translateY(-6px);transition:all .15s ease;
+}
+.dropdown-menu.open{opacity:1;pointer-events:auto;transform:translateY(0);}
+.dropdown-item{
+  display:flex;align-items:center;gap:10px;width:100%;padding:9px 11px;border-radius:8px;
+  font-size:13px;font-weight:500;color:var(--text);background:none;border:none;text-align:left;
+}
+.dropdown-item:hover{background:var(--navy-tint);color:var(--accent);}
+.dropdown-item svg{width:15px;height:15px;flex-shrink:0;color:var(--muted);}
+.dropdown-item:hover svg{color:var(--accent);}
+.dropdown-item.danger:hover{background:var(--err-tint);color:var(--err);}
+.dropdown-item.danger:hover svg{color:var(--err);}
+.dropdown-sep{height:1px;background:var(--border);margin:6px 4px;}
+
+/* ===== App shell ===== */
+.app-shell{
+  display:grid;
+  grid-template-columns:240px minmax(0,1fr);
+  align-items:start;
+  max-width:1360px;margin:0 auto;
+  padding:26px 24px 120px;
+  gap:26px;
+}
+
+/* ===== Rail nav ===== */
+.rail{
+  position:sticky;top:82px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:10px;
+  box-shadow:var(--shadow-sm);
+  transition:background .25s ease, border-color .25s ease;
+}
+.rail-progress{padding:12px 10px 14px;border-bottom:1px solid var(--border);margin-bottom:8px;}
+.rail-progress-label{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;}
+.rail-progress-track{height:5px;background:var(--navy-tint);border-radius:6px;overflow:hidden;}
+.rail-progress-fill{height:100%;background:var(--accent);border-radius:6px;width:0%;transition:width .35s ease;}
+.rail-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;}
+.rail-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;font-size:13px;color:var(--muted);font-weight:500;border:none;background:none;width:100%;text-align:left;transition:background .15s ease,color .15s ease;}
+.rail-item:hover{background:var(--navy-tint);color:var(--accent);}
+.rail-item.active{background:var(--navy-tint);color:var(--accent);font-weight:600;}
+.rail-num{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border-strong);display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:600;color:var(--muted-2);flex-shrink:0;transition:all .15s ease;}
+.rail-item.active .rail-num{border-color:var(--accent);color:var(--accent);}
+.rail-item.filled .rail-num{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}
+.rail-item.filled .rail-num::after{content:'✓';font-size:11px;}
+.rail-item.filled .rail-num span{display:none;}
+
+/* ===== Document column ===== */
+.document{display:flex;flex-direction:column;gap:18px;min-width:0;}
+
+.doc-title{
+  background:var(--navy);color:var(--white);border-radius:var(--radius-lg);
+  padding:30px 34px;display:flex;align-items:center;justify-content:space-between;
+  gap:24px;flex-wrap:wrap;box-shadow:var(--shadow);position:relative;overflow:hidden;
+}
+.doc-title::after{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(600px 200px at 85% -20%, rgba(255,255,255,0.06), transparent);
+}
+.doc-title-left{display:flex;align-items:center;gap:18px;}
+.doc-logo-slot{
+  width:62px;height:62px;border-radius:14px;border:1.5px dashed rgba(255,255,255,0.35);
+  display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.5);
+  font-size:10px;text-align:center;line-height:1.2;padding:4px;flex-shrink:0;overflow:hidden;
+  background:rgba(255,255,255,0.04);cursor:pointer;transition:border-color .15s ease;
+}
+.doc-logo-slot img{width:100%;height:100%;object-fit:contain;}
+.doc-logo-slot.has-logo{border-style:solid;border-color:rgba(255,255,255,0.2);}
+.doc-logo-slot:hover{border-color:rgba(255,255,255,0.55);}
+.doc-title-text .eyebrow{font-size:11px;font-weight:700;letter-spacing:0.16em;color:rgba(255,255,255,0.55);text-transform:uppercase;margin-bottom:6px;}
+.doc-title-text h1{font-family:var(--font-display);font-size:26px;font-weight:700;margin:0 0 4px;letter-spacing:0.1px;}
+.doc-title-text p{margin:0;font-size:13px;color:rgba(255,255,255,0.65);}
+.doc-title-right{text-align:right;}
+.estimate-num-display{font-family:var(--font-display);font-size:15px;font-weight:700;letter-spacing:0.02em;}
+.estimate-num-display span{display:block;font-size:10px;font-weight:600;color:rgba(255,255,255,0.55);text-transform:uppercase;letter-spacing:0.12em;margin-bottom:3px;}
+
+/* ===== Section cards ===== */
+.section{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:26px 30px 30px;scroll-margin-top:96px;box-shadow:var(--shadow-sm);transition:background .25s ease, border-color .25s ease;}
+.section-head{display:flex;align-items:baseline;gap:10px;margin-bottom:20px;}
+.section-head .num{font-family:var(--font-display);font-size:11.5px;font-weight:700;color:var(--muted-2);letter-spacing:0.08em;}
+.section-head h2{font-family:var(--font-display);font-size:16.5px;font-weight:700;margin:0;color:var(--accent);}
+.section-sub{font-size:12.5px;color:var(--muted);margin:-14px 0 20px;}
+
+.field-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+.field-grid.cols-2{grid-template-columns:repeat(2,1fr);}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0;}
+.field.span-2{grid-column:span 2;}
+.field.span-3{grid-column:span 3;}
+.field label{font-size:11.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;}
+.field label .opt{text-transform:none;font-weight:400;color:var(--muted-2);letter-spacing:0;}
+.field input[type=text],.field input[type=email],.field input[type=tel],.field input[type=number],.field input[type=date],.field input[type=time],.field select,.field textarea{
+  border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;color:var(--text);
+  background:var(--card);transition:border-color .15s ease, box-shadow .15s ease;width:100%;
+}
+.field textarea{resize:vertical;min-height:90px;line-height:1.5;font-family:var(--font-body);}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3.5px var(--navy-tint);}
+.field input.invalid,.field textarea.invalid,.field select.invalid{border-color:var(--err);box-shadow:0 0 0 3.5px var(--err-tint);}
+.field select{appearance:none;-webkit-appearance:none;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%236B7686'><path d='M5.5 7.5l4.5 5 4.5-5z'/></svg>");
+  background-repeat:no-repeat;background-position:right 10px center;background-size:16px;padding-right:32px;}
+
+/* ===== Checkbox grid ===== */
+.check-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.check-item{display:flex;align-items:center;gap:9px;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;font-size:13.5px;font-weight:500;color:var(--text);transition:border-color .15s ease, background .15s ease;user-select:none;}
+.check-item:hover{border-color:var(--border-strong);}
+.check-item.checked{border-color:var(--accent);background:var(--navy-tint);color:var(--accent);}
+.check-item input{display:none;}
+.check-box{width:17px;height:17px;border-radius:5px;border:1.5px solid var(--border-strong);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s ease;background:var(--card);}
+.check-item.checked .check-box{background:var(--accent);border-color:var(--accent);}
+.check-box svg{width:11px;height:11px;opacity:0;transition:opacity .1s ease;stroke:var(--accent-ink);}
+.check-item.checked .check-box svg{opacity:1;}
+.check-item .price-tag{margin-left:auto;font-size:11.5px;font-weight:700;color:var(--muted-2);flex-shrink:0;}
+.check-item.checked .price-tag{color:var(--accent);}
+.check-item.with-price .price-input{display:none;width:58px;border:1.5px solid var(--border);border-radius:6px;padding:3px 5px;font-size:11.5px;text-align:right;margin-left:auto;flex-shrink:0;background:var(--card);color:var(--text);}
+.check-item.with-price.checked .price-input{display:block;}
+.check-item.with-price.checked .price-tag{display:none;}
+.other-input{margin-top:10px;}
+.other-input input{width:100%;}
+.hidden{display:none !important;}
+
+/* ===== Pricing table ===== */
+.price-table-wrap{border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+table.price-table{width:100%;border-collapse:collapse;}
+.price-table thead th{background:var(--navy-tint);color:var(--accent);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;text-align:left;padding:11px 12px;border-bottom:1.5px solid var(--border);}
+.price-table th.num,.price-table td.num{text-align:right;}
+.price-table td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.price-table tbody tr:last-child td{border-bottom:none;}
+.price-table tbody tr{transition:background .15s ease;}
+.price-table tbody tr.drag-over{background:var(--navy-tint);}
+.price-table input{border:1.5px solid transparent;border-radius:7px;padding:8px 9px;font-size:13.5px;width:100%;background:transparent;color:var(--text);transition:all .15s ease;}
+.price-table input:hover{background:var(--bg);}
+.price-table input:focus{outline:none;border-color:var(--accent);background:var(--card);box-shadow:0 0 0 3px var(--navy-tint);}
+.price-table td.row-total{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;padding-right:10px;}
+.row-actions{display:flex;gap:3px;align-items:center;flex-wrap:nowrap;}
+.row-act-btn{width:26px;height:26px;border-radius:7px;border:1px solid var(--border);background:var(--card);color:var(--muted-2);display:flex;align-items:center;justify-content:center;transition:all .15s ease;flex-shrink:0;}
+.row-act-btn:hover{background:var(--navy-tint);color:var(--accent);border-color:var(--accent);}
+.row-act-btn.del:hover{background:var(--err-tint);color:var(--err);border-color:var(--err);}
+.row-act-btn svg{width:12px;height:12px;}
+.add-row-btn{display:flex;align-items:center;gap:7px;padding:12px 14px;font-size:13px;font-weight:700;color:var(--accent);background:var(--navy-tint);border:none;width:100%;justify-content:center;transition:background .15s ease;}
+.add-row-btn:hover{background:var(--navy-tint-2);}
+.add-row-btn svg{width:14px;height:14px;}
+
+.totals-block{display:flex;justify-content:flex-end;margin-top:18px;gap:24px;flex-wrap:wrap;align-items:flex-start;}
+
+/* ===== Toggle switch ===== */
+.switch{position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0;}
+.switch input{opacity:0;width:0;height:0;position:absolute;}
+.switch-slider{position:absolute;cursor:pointer;inset:0;background:var(--border-strong);border-radius:22px;transition:background .2s ease;}
+.switch-slider::before{content:'';position:absolute;height:16px;width:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:transform .2s ease;box-shadow:0 1px 2px rgba(0,0,0,0.25);}
+.switch input:checked + .switch-slider{background:var(--accent);}
+.switch input:checked + .switch-slider::before{transform:translateX(18px);}
+.switch-wrap{display:flex;align-items:center;gap:9px;cursor:pointer;user-select:none;}
+.switch-wrap .switch-label{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;}
+
+/* ===== Smart Pricing card ===== */
+.smart-pricing-card{border:1.5px solid var(--border);border-radius:var(--radius);padding:16px 18px;margin-bottom:18px;background:var(--navy-tint);transition:opacity .2s ease;}
+.smart-pricing-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+.smart-pricing-title strong{display:block;font-size:13.5px;color:var(--accent);font-weight:700;}
+.smart-pricing-title span{font-size:11.5px;color:var(--muted);}
+.smart-pricing-body{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}
+.smart-price-value{font-family:var(--font-display);font-size:24px;font-weight:800;color:var(--accent);}
+.smart-price-note{font-size:11.5px;color:var(--muted);}
+.smart-pricing-card.manual-active .smart-pricing-body{opacity:.4;pointer-events:none;}
+.currency-block{display:flex;flex-direction:column;gap:6px;margin-right:auto;min-width:140px;}
+.currency-block label{font-size:11.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;}
+.currency-block select{border:1.5px solid var(--border);border-radius:8px;padding:9px 10px;font-size:13px;background:var(--card);color:var(--text);}
+.totals-inner{width:100%;max-width:320px;display:flex;flex-direction:column;gap:10px;}
+.totals-row{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13.5px;}
+.totals-row.grand{border-top:1.5px solid var(--border);margin-top:4px;padding-top:14px;font-size:16px;font-weight:800;color:var(--accent);}
+.totals-row label{color:var(--muted);font-weight:500;}
+.totals-row .val{font-weight:700;font-variant-numeric:tabular-nums;}
+.totals-edit{display:flex;align-items:center;gap:6px;}
+.totals-edit input[type=number]{width:78px;text-align:right;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:13px;font-variant-numeric:tabular-nums;background:var(--card);color:var(--text);}
+.totals-edit select{border:1.5px solid var(--border);border-radius:7px;padding:6px 6px;font-size:12.5px;background:var(--card);color:var(--text);}
+.totals-edit input:focus,.totals-edit select:focus{outline:none;border-color:var(--accent);}
+
+/* ===== Terms box ===== */
+.terms-box textarea{min-height:120px;font-size:13.5px;line-height:1.6;color:var(--muted);}
+
+/* ===== Signature blocks ===== */
+.sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+.sig-block{border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;}
+.sig-block h3{font-family:var(--font-display);font-size:13px;margin:0 0 16px;color:var(--accent);font-weight:700;}
+.sig-line{border-bottom:1.5px solid var(--border-strong);height:44px;margin-bottom:6px;}
+.sig-caption{font-size:10.5px;color:var(--muted-2);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:16px;}
+
+/* ===== Signature pad slot (in-form) ===== */
+.sig-pad-slot{
+  position:relative;height:112px;border-radius:12px;
+  border:1.5px dashed var(--border-strong);background:var(--bg);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  transition:border-color .15s ease, background .15s ease;margin-bottom:8px;
+}
+.sig-pad-slot:hover{border-color:var(--accent);}
+.sig-pad-slot.has-sig{border-style:solid;border-color:var(--border);background:#FFFFFF;}
+.sig-pad-slot.invalid{border-color:var(--err);box-shadow:0 0 0 3.5px var(--err-tint);}
+.sig-empty-cta{display:flex;flex-direction:column;align-items:center;gap:7px;color:var(--muted);pointer-events:none;}
+.sig-empty-cta svg{width:20px;height:20px;color:var(--muted-2);}
+.sig-empty-cta span{font-size:12.5px;font-weight:700;letter-spacing:0.02em;}
+.sig-pad-slot img{max-width:88%;max-height:80%;object-fit:contain;}
+.sig-slot-controls{position:absolute;top:7px;right:7px;display:flex;gap:5px;}
+.sig-slot-btn{width:25px;height:25px;border-radius:7px;border:1px solid var(--border);background:var(--card);color:var(--muted);display:flex;align-items:center;justify-content:center;transition:all .15s ease;}
+.sig-slot-btn:hover{background:var(--navy-tint);color:var(--accent);border-color:var(--accent);}
+.sig-slot-btn.remove:hover{background:var(--err-tint);color:var(--err);border-color:var(--err);}
+.sig-slot-btn svg{width:12px;height:12px;}
+
+/* ===== Signature modal ===== */
+.sig-tabs{display:flex;gap:18px;border-bottom:1.5px solid var(--border);margin-bottom:16px;}
+.sig-tab{padding:9px 2px 11px;font-size:13px;font-weight:700;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1.5px;transition:color .15s ease,border-color .15s ease;}
+.sig-tab:hover{color:var(--accent);}
+.sig-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.sig-tab-panel.hidden{display:none;}
+.sig-canvas-wrap{position:relative;border:1.5px solid var(--border);border-radius:12px;background:#FFFFFF;height:230px;touch-action:none;overflow:hidden;}
+.sig-canvas-wrap canvas{width:100%;height:100%;display:block;cursor:crosshair;touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;}
+.sig-canvas-baseline{position:absolute;left:24px;right:24px;bottom:38px;height:1px;background:#E3E7EE;pointer-events:none;}
+.sig-canvas-placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#B7C0CE;font-size:14.5px;font-weight:500;pointer-events:none;letter-spacing:0.01em;}
+.sig-pad-actions{display:flex;justify-content:flex-end;margin-top:12px;}
+.sig-upload-drop{
+  border:1.5px dashed var(--border-strong);border-radius:12px;height:230px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  cursor:pointer;background:var(--bg);color:var(--muted);font-size:13px;font-weight:500;text-align:center;padding:20px;
+}
+.sig-upload-drop:hover{border-color:var(--accent);}
+.sig-upload-drop.has-img{border-style:solid;border-color:var(--border);background:#FFFFFF;}
+.sig-upload-drop svg{width:22px;height:22px;color:var(--muted-2);}
+.sig-upload-drop img{max-width:88%;max-height:85%;object-fit:contain;}
+
+/* ===== Top bar: install button + status badge ===== */
+.tbtn.install-btn{background:rgba(255,255,255,0.14);}
+
+/* ===== Dashboard ===== */
+.dash-shell{max-width:1360px;margin:0 auto;padding:26px 24px 120px;}
+.dash-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:22px;}
+.dash-head h1{font-family:var(--font-display);font-size:22px;font-weight:800;margin:0 0 4px;color:var(--text);}
+.dash-head p{margin:0;font-size:13px;color:var(--muted);}
+.dash-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:26px;}
+.dash-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-sm);}
+.dash-card .dc-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;}
+.dash-card .dc-value{font-family:var(--font-display);font-size:26px;font-weight:800;color:var(--accent);}
+.dash-card.accent-ok .dc-value{color:var(--ok);}
+.dash-card.accent-err .dc-value{color:var(--err);}
+.dash-section{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:22px 24px;margin-bottom:20px;box-shadow:var(--shadow-sm);}
+.dash-section h2{font-family:var(--font-display);font-size:15px;font-weight:700;color:var(--accent);margin:0 0 14px;}
+.dash-followup-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.dash-followup-item:last-child{border-bottom:none;}
+.dash-followup-item b{color:var(--text);}
+.dash-followup-item .fu-date{font-size:11.5px;color:var(--err);font-weight:700;}
+.dash-client-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.dash-client-item:last-child{border-bottom:none;}
+.dash-empty{color:var(--muted-2);font-size:13px;padding:12px 0;}
+.dash-new-btn{display:flex;align-items:center;gap:8px;}
+@media (max-width:960px){ .dash-cards{grid-template-columns:repeat(2,1fr);} }
+@media (max-width:600px){ .dash-cards{grid-template-columns:1fr;} }
+
+/* ===== Status badge ===== */
+.status-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;}
+.status-badge::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;}
+.status-Pending{background:var(--navy-tint);color:var(--accent);}
+.status-Sent{background:rgba(111,168,255,0.15);color:#3B6FD1;}
+.status-Accepted{background:var(--ok-tint);color:var(--ok);}
+.status-Declined{background:var(--err-tint);color:var(--err);}
+.status-InProgress{background:rgba(184,134,11,0.14);color:#B8860B;}
+.status-Completed{background:var(--ok-tint);color:var(--ok);}
+
+/* ===== Client autocomplete ===== */
+.autocomplete-wrap{position:relative;}
+.autocomplete-list{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--card);border:1.5px solid var(--border);border-radius:10px;box-shadow:var(--shadow);z-index:30;max-height:220px;overflow-y:auto;display:none;}
+.autocomplete-list.open{display:block;}
+.autocomplete-item{padding:10px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--border);}
+.autocomplete-item:last-child{border-bottom:none;}
+.autocomplete-item:hover{background:var(--navy-tint);}
+.autocomplete-item b{display:block;color:var(--text);font-size:13px;}
+.autocomplete-item span{font-size:11px;color:var(--muted);}
+
+/* ===== Clients overlay ===== */
+.client-list-item{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;}
+.client-list-item-info b{display:block;font-size:13.5px;color:var(--accent);}
+.client-list-item-info span{font-size:11.5px;color:var(--muted);}
+.client-fav-btn{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--muted-2);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.client-fav-btn.is-fav{color:#D4A017;border-color:#D4A017;background:rgba(212,160,23,0.1);}
+.client-fav-btn svg{width:15px;height:15px;}
+.client-fav-btn.is-fav svg{fill:#D4A017;}
+
+/* ===== Share overlay ===== */
+.share-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+.share-btn{display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:12px;border:1.5px solid var(--border);background:var(--card);color:var(--text);font-size:13px;font-weight:600;transition:all .15s ease;}
+.share-btn:hover{border-color:var(--accent);background:var(--navy-tint);color:var(--accent);}
+.share-btn svg{width:17px;height:17px;flex-shrink:0;}
+
+/* ===== Settings ===== */
+.settings-section{margin-bottom:24px;}
+.settings-section h4{font-family:var(--font-display);font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin:0 0 12px;border-bottom:1px solid var(--border);padding-bottom:8px;}
+.color-swatches{display:flex;gap:8px;flex-wrap:wrap;}
+.color-swatch{width:32px;height:32px;border-radius:9px;border:2px solid var(--border);cursor:pointer;}
+.color-swatch.active{border-color:var(--text);box-shadow:0 0 0 2px var(--card),0 0 0 4px var(--text);}
+
+/* ===== PIN lock screen ===== */
+.lock-screen{position:fixed;inset:0;z-index:500;background:var(--navy);color:var(--white);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;}
+.lock-screen.hidden{display:none;}
+.lock-logo{width:64px;height:64px;border-radius:16px;overflow:hidden;}
+.lock-logo img{width:100%;height:100%;object-fit:contain;}
+.lock-title{font-family:var(--font-display);font-size:17px;font-weight:700;}
+.lock-dots{display:flex;gap:14px;}
+.lock-dot{width:14px;height:14px;border-radius:50%;border:1.5px solid rgba(255,255,255,0.4);transition:all .15s ease;}
+.lock-dot.filled{background:#fff;border-color:#fff;}
+.lock-keypad{display:grid;grid-template-columns:repeat(3,64px);gap:14px;}
+.lock-key{width:64px;height:64px;border-radius:50%;border:1.5px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.06);color:#fff;font-size:20px;font-weight:600;display:flex;align-items:center;justify-content:center;}
+.lock-key:active{background:rgba(255,255,255,0.2);}
+.lock-key.ghost{border:none;background:none;}
+.lock-error{font-size:12.5px;color:#FF8A80;height:16px;}
+.lock-biometric-btn{display:flex;align-items:center;gap:8px;padding:10px 18px;border-radius:10px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.25);color:#fff;font-size:13px;font-weight:600;}
+
+
+/* ===== Toast ===== */
+.toast-stack{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:200;display:flex;flex-direction:column;gap:10px;align-items:center;}
+.toast{display:flex;align-items:center;gap:10px;background:var(--navy);color:var(--white);padding:13px 20px;border-radius:12px;font-size:13.5px;font-weight:500;box-shadow:var(--shadow-lg);animation:toast-in .25s cubic-bezier(.2,.8,.2,1);max-width:420px;}
+.toast.err{background:var(--err);}
+.toast.ok{background:var(--ok);}
+.toast svg{width:16px;height:16px;flex-shrink:0;}
+@keyframes toast-in{from{opacity:0;transform:translateY(10px) scale(.96);}to{opacity:1;transform:translateY(0) scale(1);}}
+.toast.leaving{animation:toast-out .2s ease forwards;}
+@keyframes toast-out{to{opacity:0;transform:translateY(6px) scale(.96);}}
+
+/* ===== Modal / overlay ===== */
+.overlay{position:fixed;inset:0;background:rgba(4,10,20,0.55);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);z-index:150;display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity .2s ease;}
+.overlay.open{opacity:1;pointer-events:auto;}
+.overlay-panel{background:var(--card);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);width:100%;max-height:88vh;display:flex;flex-direction:column;transform:translateY(12px) scale(.98);transition:transform .22s cubic-bezier(.2,.8,.2,1);border:1px solid var(--border);}
+.overlay.open .overlay-panel{transform:translateY(0) scale(1);}
+.overlay-panel.small{max-width:420px;}
+.overlay-panel.wide{max-width:920px;}
+.overlay-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border);gap:12px;}
+.overlay-head h3{font-family:var(--font-display);font-size:15.5px;margin:0;color:var(--accent);}
+.overlay-close{width:30px;height:30px;border-radius:8px;border:none;background:var(--bg);color:var(--muted);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.overlay-close:hover{background:var(--border);}
+.overlay-close svg{width:14px;height:14px;}
+.overlay-body{padding:22px;overflow-y:auto;}
+.overlay-foot{display:flex;justify-content:flex-end;gap:10px;padding:16px 22px;border-top:1px solid var(--border);}
+
+.btn{padding:10px 18px;border-radius:9px;font-size:13.5px;font-weight:700;border:1.5px solid transparent;transition:all .15s ease;}
+.btn.ghost{background:var(--card);border-color:var(--border);color:var(--text);}
+.btn.ghost:hover{border-color:var(--border-strong);background:var(--bg);}
+.btn.danger{background:var(--err);color:var(--white);}
+.btn.danger:hover{background:#A93327;}
+.btn.dark{background:var(--navy);color:var(--white);}
+.btn.dark:hover{background:var(--navy-deep);}
+.overlay-body p{font-size:13.5px;color:var(--muted);line-height:1.6;margin:0;}
+
+.preview-frame-wrap{background:var(--bg);border-radius:var(--radius);padding:20px;overflow:auto;display:flex;justify-content:center;}
+.preview-frame-wrap iframe{width:850px;max-width:100%;height:1000px;border:none;background:var(--white);box-shadow:var(--shadow);border-radius:4px;}
+
+.search-input-wrap{position:relative;margin-bottom:16px;}
+.search-input-wrap svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--muted-2);}
+.search-input-wrap input{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px 10px 36px;font-size:13.5px;background:var(--card);color:var(--text);}
+.search-input-wrap input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3.5px var(--navy-tint);}
+
+.saved-list{display:flex;flex-direction:column;gap:8px;}
+.saved-item{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .15s ease;}
+.saved-item:hover{border-color:var(--border-strong);}
+.saved-item-info b{display:block;font-size:13.5px;color:var(--accent);}
+.saved-item-info span{font-size:11.5px;color:var(--muted);}
+.saved-item-actions{display:flex;gap:6px;}
+.saved-item-actions button{padding:7px 12px;border-radius:7px;font-size:12px;font-weight:700;border:1.5px solid var(--border);background:var(--card);color:var(--text);}
+.saved-item-actions button:hover{background:var(--bg);}
+.saved-item-actions button.load{border-color:var(--accent);color:var(--accent);}
+.saved-item-actions button.del:hover{background:var(--err-tint);color:var(--err);border-color:var(--err);}
+.saved-empty{text-align:center;color:var(--muted-2);font-size:13px;padding:30px 10px;}
+
+.logo-upload-body{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;}
+.logo-upload-preview{width:120px;height:120px;border-radius:16px;border:1.5px dashed var(--border-strong);display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--bg);}
+.logo-upload-preview img{width:100%;height:100%;object-fit:contain;}
+.logo-upload-preview span{font-size:11px;color:var(--muted-2);}
+
+@media (max-width:960px){
+  .app-shell{grid-template-columns:1fr;padding:20px 16px 100px;}
+  .rail{position:static;display:flex;overflow-x:auto;gap:4px;padding:8px;}
+  .rail-progress{display:none;}
+  .rail-list{flex-direction:row;}
+  .rail-item{flex-shrink:0;}
+  .field-grid,.field-grid.cols-2{grid-template-columns:repeat(2,1fr);}
+  .field.span-3{grid-column:span 2;}
+  .check-grid{grid-template-columns:repeat(2,1fr);}
+  .sig-grid{grid-template-columns:1fr;}
+  .doc-title{padding:24px;}
+  .doc-title-right{width:100%;text-align:left;}
+  .tbtn-label{display:none;}
+  .tbtn.primary .tbtn-label{display:inline;}
+  .preview-frame-wrap iframe{height:75vh;}
+  .currency-block{margin-right:0;width:100%;}
+  .totals-block{flex-direction:column;align-items:stretch;}
+  .totals-inner{max-width:none;}
+}
+@media (max-width:600px){
+  .field-grid,.field-grid.cols-2{grid-template-columns:1fr;}
+  .field.span-2,.field.span-3{grid-column:span 1;}
+  .check-grid{grid-template-columns:1fr 1fr;}
+  .section{padding:22px 18px 24px;}
+  .topbar{padding:10px 14px;}
+  .brand-name span{display:none;}
+}
+</style>
+</head>
+<body>
+<!-- PIN lock screen (only shown if App Lock is enabled in Settings) -->
+<div class="lock-screen hidden" id="lockScreen">
+  <div class="lock-logo" id="lockLogo"></div>
+  <div class="lock-title">Enter PIN to unlock</div>
+  <div class="lock-dots" id="lockDots"></div>
+  <div class="lock-error" id="lockError"></div>
+  <div class="lock-keypad" id="lockKeypad"></div>
+  <button class="lock-biometric-btn hidden" id="lockBiometricBtn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 11c0 3.5-1.5 6.5-3 8"/><path d="M7 8.5A5 5 0 0 1 17 8a19 19 0 0 1-.6 5"/><path d="M3 12a9 9 0 0 1 15.5-6.2"/><path d="M12 11a2 2 0 0 1 4 0c0 3-1 5.5-2 7.5"/><path d="M8 15a12 12 0 0 0 1-4"/></svg>
+    Use Face ID / Touch ID / Fingerprint
+  </button>
+</div>
+
+<input type="file" id="logoFileInput" accept="image/*" class="hidden">
+
+<header class="topbar">
+  <div class="brand-logo-slot" id="topLogoSlot" title="Click to change logo">LOGO</div>
+  <div class="brand-name">
+    <b>Bridiant Facility Group</b>
+    <span>Estimate Builder</span>
+  </div>
+  <div class="topbar-actions">
+    <button class="tbtn install-btn hidden" id="btnInstall" title="Install app">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+      <span class="tbtn-label">Install</span>
+    </button>
+    <button class="tbtn icon-only" id="btnDashboard" title="Dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+    </button>
+    <button class="tbtn icon-only" id="btnSearch" title="Quick search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+    </button>
+    <button class="tbtn icon-only" id="btnDarkToggle" title="Toggle dark mode">
+      <svg id="iconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
+      <svg id="iconSun" class="hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    </button>
+    <button class="tbtn" id="btnHistory" title="Estimate history">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
+      <span class="tbtn-label">History</span>
+    </button>
+    <div class="menu-wrap">
+      <button class="tbtn icon-only" id="btnMore" title="More actions">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+      </button>
+      <div class="dropdown-menu" id="moreMenu">
+        <button class="dropdown-item" id="mnuClients"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Clients</button>
+        <button class="dropdown-item" id="mnuShare"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg>Share estimate</button>
+        <button class="dropdown-item" id="mnuDuplicate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Duplicate estimate</button>
+        <button class="dropdown-item" id="mnuPrint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>Print directly</button>
+        <button class="dropdown-item" id="mnuExcel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="m9 13 6 6M15 13l-6 6"/></svg>Export to Excel</button>
+        <button class="dropdown-item" id="mnuCsv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>Export to CSV</button>
+        <button class="dropdown-item" id="mnuLogo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg>Change logo</button>
+        <button class="dropdown-item" id="mnuSettings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>Settings</button>
+        <div class="dropdown-sep"></div>
+        <button class="dropdown-item danger" id="mnuDelete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>Delete estimate</button>
+        <button class="dropdown-item danger" id="mnuClear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>Clear form</button>
+      </div>
+    </div>
+
+    <button class="tbtn" id="btnSave" title="Save estimate">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>
+      <span class="tbtn-label">Save</span>
+    </button>
+    <button class="tbtn" id="btnPreview" title="Preview PDF">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
+      <span class="tbtn-label">Preview</span>
+    </button>
+    <button class="tbtn primary" id="btnGenerate" title="Generate Professional PDF">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>
+      <span class="tbtn-label">Generate PDF</span>
+    </button>
+  </div>
+</header>
+
+<!-- Dashboard view -->
+<div class="dash-shell hidden" id="dashboardView">
+  <div class="dash-head">
+    <div>
+      <h1>Welcome back</h1>
+      <p>Here's how your estimates are doing.</p>
+    </div>
+    <button class="tbtn primary dash-new-btn" id="btnNewFromDash" style="color:var(--navy);background:var(--navy);color:#fff;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+      New Estimate
+    </button>
+  </div>
+
+  <div class="dash-cards" id="dashCards"></div>
+
+  <div class="dash-section">
+    <h2>Needs Follow-Up</h2>
+    <div id="dashFollowups"><div class="dash-empty">Nothing due right now.</div></div>
+  </div>
+
+  <div class="dash-section">
+    <h2>Recent Clients</h2>
+    <div id="dashClients"><div class="dash-empty">No clients yet — save your first estimate to see them here.</div></div>
+  </div>
+</div>
+
+<div class="app-shell" id="builderView">
+  <nav class="rail" id="rail">
+    <div class="rail-progress">
+      <div class="rail-progress-label"><span>Progress</span><span id="progressPct">0%</span></div>
+      <div class="rail-progress-track"><div class="rail-progress-fill" id="progressFill"></div></div>
+    </div>
+    <ul class="rail-list" id="railList"></ul>
+  </nav>
+
+  <main class="document">
+    <div class="doc-title">
+      <div class="doc-title-left">
+        <div class="doc-logo-slot" id="docLogoSlot" title="Click to change logo">YOUR<br>LOGO</div>
+        <div class="doc-title-text">
+          <div class="eyebrow">Service Estimate</div>
+          <h1>Bridiant Facility Group</h1>
+          <p>Professional Cleaning Services</p>
+        </div>
+      </div>
+      <div class="doc-title-right">
+        <div class="estimate-num-display"><span>Estimate No.</span><span id="estimateNumDisplay">EST-2026-0001</span></div>
+      </div>
+    </div>
+
+    <!-- 1. Estimate Details -->
+    <section class="section" id="sec-details" data-section="Estimate Details">
+      <div class="section-head"><span class="num">01</span><h2>Estimate Details</h2></div>
+      <div class="field-grid">
+        <div class="field"><label>Estimate Number</label><input type="text" id="f_estimateNumber"></div>
+        <div class="field"><label>Date</label><input type="date" id="f_date"></div>
+        <div class="field"><label>Expiration Date</label><input type="date" id="f_expiration"></div>
+        <div class="field span-3"><label>Prepared By</label><input type="text" id="f_preparedBy" placeholder="Full name"></div>
+        <div class="field">
+          <label>Status</label>
+          <select id="f_status">
+            <option>Pending</option>
+            <option>Sent</option>
+            <option>Accepted</option>
+            <option>Declined</option>
+            <option>In Progress</option>
+            <option>Completed</option>
+          </select>
+        </div>
+        <div class="field"><label>Follow-Up Date <span class="opt">(optional)</span></label><input type="date" id="f_followUpDate"></div>
+        <div class="field span-3"><label>Follow-Up Notes <span class="opt">(optional)</span></label><input type="text" id="f_followUpNotes" placeholder="e.g. Call to confirm after they review with their spouse"></div>
+      </div>
+    </section>
+
+    <!-- 2. Client Information -->
+    <section class="section" id="sec-client" data-section="Client Information">
+      <div class="section-head"><span class="num">02</span><h2>Client Information</h2></div>
+      <div class="field-grid">
+        <div class="field autocomplete-wrap"><label>Client Name</label><input type="text" id="f_clientName" placeholder="Jane Doe" required autocomplete="off"><div class="autocomplete-list" id="clientAutocomplete"></div></div>
+        <div class="field"><label>Company <span class="opt">(optional)</span></label><input type="text" id="f_clientCompany"></div>
+        <div class="field"><label>Phone Number</label><input type="tel" id="f_clientPhone" placeholder="(555) 555-5555"></div>
+        <div class="field"><label>Email</label><input type="email" id="f_clientEmail" placeholder="name@email.com"></div>
+        <div class="field span-2"><label>Service Address</label><input type="text" id="f_propertyAddress" placeholder="Street address" required></div>
+        <div class="field"><label>City</label><input type="text" id="f_city"></div>
+        <div class="field"><label>State</label><input type="text" id="f_state" placeholder="TX"></div>
+        <div class="field"><label>ZIP Code</label><input type="text" id="f_zip"></div>
+        <div class="field span-3"><label>Billing Address <span class="opt">(optional, if different)</span></label><input type="text" id="f_billingAddress"></div>
+      </div>
+    </section>
+
+    <!-- 3. Property Information -->
+    <section class="section" id="sec-property" data-section="Property Information">
+      <div class="section-head"><span class="num">03</span><h2>Property Information</h2></div>
+      <div class="field-grid">
+        <div class="field">
+          <label>Property Type</label>
+          <select id="f_propertyType">
+            <option value="">Select…</option>
+            <option>House</option>
+            <option>Apartment</option>
+            <option>Condo</option>
+            <option>Office</option>
+            <option>Medical Office</option>
+            <option>Warehouse</option>
+            <option>Retail Store</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="field"><label>Square Footage <span class="opt">(sq ft)</span></label><input type="number" id="f_sqft" min="0" step="1" placeholder="e.g. 1800"></div>
+        <div class="field"><label>Condition of Property</label>
+          <select id="f_condition">
+            <option value="">Select…</option>
+            <option>Excellent</option>
+            <option>Good</option>
+            <option>Fair</option>
+            <option>Heavy Dirt</option>
+            <option>Extremely Dirty</option>
+          </select>
+        </div>
+        <div class="field"><label>Bedrooms</label><input type="number" id="f_bedrooms" min="0" step="1"></div>
+        <div class="field"><label>Bathrooms</label><input type="number" id="f_bathrooms" min="0" step="0.5"></div>
+        <div class="field"><label>Kitchens</label><input type="number" id="f_kitchens" min="0" step="1"></div>
+        <div class="field"><label>Floors</label><input type="number" id="f_floors" min="0" step="1"></div>
+        <div class="field"><label>Living Rooms</label><input type="number" id="f_livingRooms" min="0" step="1"></div>
+        <div class="field"><label>Dining Rooms</label><input type="number" id="f_diningRooms" min="0" step="1"></div>
+        <div class="field"><label>Offices</label><input type="number" id="f_offices" min="0" step="1"></div>
+        <div class="field"><label>Windows <span class="opt">(optional)</span></label><input type="number" id="f_windows" min="0" step="1"></div>
+        <div class="field">
+          <label>Garage</label>
+          <select id="f_garage">
+            <option value="">Select…</option>
+            <option>None</option>
+            <option>1 Car</option>
+            <option>2 Car</option>
+            <option>3 Car</option>
+          </select>
+        </div>
+        <div class="field"><label>Pets in Property</label>
+          <select id="f_pets"><option value="">Select…</option><option>Yes</option><option>No</option></select>
+        </div>
+        <div class="field"><label>Occupied Property</label>
+          <select id="f_occupied"><option value="">Select…</option><option>Yes</option><option>No</option></select>
+        </div>
+        <div class="field"><label>Post Construction</label>
+          <select id="f_postConstruction"><option value="">Select…</option><option>Yes</option><option>No</option></select>
+        </div>
+        <div class="field"><label>Supplies Included</label>
+          <select id="f_suppliesIncluded"><option value="">Select…</option><option>Yes</option><option>No</option></select>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. Property Details -->
+    <section class="section" id="sec-propertydetails" data-section="Property Details">
+      <div class="section-head"><span class="num">04</span><h2>Property Details</h2></div>
+      <div class="section-sub">Select any that apply to this cleaning service.</div>
+      <div class="check-grid" id="propertyDetailsGrid"></div>
+    </section>
+
+    <!-- 5. Service Details -->
+    <section class="section" id="sec-service" data-section="Service Details">
+      <div class="section-head"><span class="num">05</span><h2>Service Details</h2></div>
+      <div class="field-grid cols-2">
+        <div class="field">
+          <label>Cleaning Type</label>
+          <select id="f_cleaningType" required>
+            <option value="">Select a service…</option>
+            <option>Residential Cleaning</option>
+            <option>Commercial Cleaning</option>
+            <option>Office Cleaning</option>
+            <option>Deep Cleaning</option>
+            <option>Move In</option>
+            <option>Move Out</option>
+            <option>Post Construction Cleaning</option>
+            <option>Medical Office Cleaning</option>
+            <option>Janitorial Services</option>
+            <option>Retail Cleaning</option>
+            <option>Airbnb Cleaning</option>
+            <option value="__custom">Custom Service…</option>
+          </select>
+        </div>
+        <div class="field hidden" id="wrap_customService">
+          <label>Custom Service</label>
+          <input type="text" id="f_customService" placeholder="Describe the service">
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. Scheduling -->
+    <section class="section" id="sec-schedule" data-section="Scheduling">
+      <div class="section-head"><span class="num">06</span><h2>Scheduling</h2></div>
+      <div class="field-grid">
+        <div class="field"><label>Requested Date</label><input type="date" id="f_reqDate"></div>
+        <div class="field"><label>Requested Time</label><input type="time" id="f_reqTime"></div>
+        <div class="field"><label>Estimated Duration</label><input type="text" id="f_duration" placeholder="e.g. 3 hours"></div>
+        <div class="field"><label>Arrival Window</label><input type="text" id="f_arrivalWindow" placeholder="e.g. 9:00–11:00 AM"></div>
+        <div class="field span-2">
+          <label>Preferred Contact Method</label>
+          <select id="f_contactMethod">
+            <option value="">Select…</option>
+            <option>Phone Call</option>
+            <option>Text Message</option>
+            <option>Email</option>
+            <option>Any</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. Access Information -->
+    <section class="section" id="sec-access" data-section="Access Information">
+      <div class="section-head"><span class="num">07</span><h2>Access Information</h2></div>
+      <div class="field-grid cols-2">
+        <div class="field"><label>Gate Code</label><input type="text" id="f_gateCode"></div>
+        <div class="field"><label>Lockbox Code</label><input type="text" id="f_lockboxCode"></div>
+        <div class="field span-2"><label>Entry Instructions</label><textarea id="f_entryInstructions" placeholder="How should the cleaning team get in?"></textarea></div>
+        <div class="field span-2"><label>Parking Instructions</label><textarea id="f_parkingInstructions" placeholder="Where should the team park?"></textarea></div>
+      </div>
+    </section>
+
+    <!-- 8. Job Description -->
+    <section class="section" id="sec-description" data-section="Job Description">
+      <div class="section-head"><span class="num">08</span><h2>Job Description</h2></div>
+      <div class="field"><textarea id="f_description" placeholder="Describe the scope of work in detail…" style="min-height:130px;"></textarea></div>
+    </section>
+
+
+    <!-- 6. Areas to Clean -->
+    <section class="section" id="sec-areas" data-section="Areas to Clean">
+      <div class="section-head"><span class="num">09</span><h2>Areas to Clean</h2></div>
+      <div class="check-grid" id="areasGrid"></div>
+      <div class="field other-input hidden" id="wrap_areaOther"><input type="text" id="f_areaOther" placeholder="Describe other area…"></div>
+    </section>
+
+    <!-- 7. Additional Services -->
+    <section class="section" id="sec-addons" data-section="Additional Services">
+      <div class="section-head"><span class="num">10</span><h2>Additional Services</h2></div>
+      <div class="section-sub">Suggested prices shown are starting values only — edit any of them, or the quantity later in Pricing.</div>
+      <div class="check-grid" id="addonsGrid"></div>
+      <div class="field other-input hidden" id="wrap_addonOther"><input type="text" id="f_addonOther" placeholder="Describe other service…"></div>
+    </section>
+
+    <!-- 8. Pricing -->
+    <section class="section" id="sec-pricing" data-section="Pricing">
+      <div class="section-head"><span class="num">11</span><h2>Pricing</h2></div>
+
+      <div class="smart-pricing-card" id="smartPricingCard">
+        <div class="smart-pricing-head">
+          <div class="smart-pricing-title">
+            <strong>Smart Pricing</strong>
+            <span>Suggested price based on square footage, bedrooms, bathrooms &amp; cleaning type</span>
+          </div>
+          <label class="switch-wrap"><span class="switch-label">Manual Pricing</span><label class="switch"><input type="checkbox" id="f_manualPricing"><span class="switch-slider"></span></label></label>
+        </div>
+        <div class="smart-pricing-body" id="smartPricingBody">
+          <div class="smart-price-value" id="smartPriceValue">$0.00</div>
+          <div class="smart-price-note">Automatically added as a line item below — edit or remove it anytime, or switch to Manual Pricing to take full control.</div>
+        </div>
+      </div>
+
+      <div class="price-table-wrap">
+        <table class="price-table">
+          <thead><tr><th style="width:42%">Description</th><th class="num" style="width:12%">Qty</th><th class="num" style="width:16%">Unit Price</th><th class="num" style="width:16%">Total</th><th style="width:14%"></th></tr></thead>
+          <tbody id="priceRows"></tbody>
+        </table>
+        <button class="add-row-btn" id="addRowBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          Add Item
+        </button>
+      </div>
+      <div class="totals-block">
+        <div class="currency-block">
+          <label>Currency &amp; Format</label>
+          <select id="f_currency">
+            <option value="USD">USD — $</option>
+            <option value="EUR">EUR — €</option>
+            <option value="GBP">GBP — £</option>
+            <option value="MXN">MXN — MX$</option>
+            <option value="CAD">CAD — CA$</option>
+          </select>
+        </div>
+        <div class="totals-inner">
+          <div class="totals-row"><label>Subtotal</label><span class="val" id="t_subtotal">$0.00</span></div>
+          <div class="totals-row">
+            <label>Discount</label>
+            <div class="totals-edit">
+              <input type="number" id="f_discountValue" min="0" step="0.01" value="0">
+              <select id="f_discountType"><option value="fixed">$</option><option value="percent">%</option></select>
+            </div>
+          </div>
+          <div class="totals-row">
+            <label>Tax</label>
+            <div class="totals-edit"><input type="number" id="f_taxRate" min="0" step="0.01" value="0"><span style="font-size:12.5px;color:var(--muted);">%</span></div>
+          </div>
+          <div class="totals-row grand"><label>Grand Total</label><span class="val" id="t_grandTotal">$0.00</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 9. Notes -->
+    <section class="section" id="sec-notes" data-section="Notes">
+      <div class="section-head"><span class="num">12</span><h2>Notes</h2></div>
+      <div class="field"><textarea id="f_notes" placeholder="Any additional observations for the client…"></textarea></div>
+    </section>
+
+    <!-- 10. Terms -->
+    <section class="section" id="sec-terms" data-section="Terms & Conditions">
+      <div class="section-head"><span class="num">13</span><h2>Terms &amp; Conditions</h2></div>
+      <div class="field terms-box">
+        <textarea id="f_terms">Estimate valid for 30 days from the date above.
+Payment is due upon completion unless otherwise agreed in writing.
+Additional work requested after approval may incur additional charges.</textarea>
+      </div>
+    </section>
+
+    <!-- 11. Company Information -->
+    <section class="section" id="sec-company" data-section="Company Information">
+      <div class="section-head"><span class="num">14</span><h2>Company Information</h2></div>
+      <div class="field-grid cols-2">
+        <div class="field"><label>Company Name</label><input type="text" id="f_companyName" value="Bridiant Facility Group"></div>
+        <div class="field"><label>Phone Number</label><input type="tel" id="f_companyPhone"></div>
+        <div class="field"><label>Email</label><input type="email" id="f_companyEmail"></div>
+        <div class="field"><label>Website</label><input type="text" id="f_companyWebsite"></div>
+        <div class="field"><label>License Number <span class="opt">(optional)</span></label><input type="text" id="f_licenseNumber"></div>
+        <div class="field"><label>Business Address</label><input type="text" id="f_companyAddress"></div>
+      </div>
+    </section>
+
+    <!-- 12. Signatures -->
+    <section class="section" id="sec-signatures" data-section="Signatures">
+      <div class="section-head"><span class="num">15</span><h2>Signatures</h2></div>
+      <div class="sig-grid">
+        <div class="sig-block">
+          <h3>Client</h3>
+          <div class="sig-pad-slot" id="sigSlotClient" data-role="client">
+            <div class="sig-empty-cta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg><span>Sign</span></div>
+          </div>
+          <div class="sig-caption">Signature</div>
+          <div class="field-grid cols-2" style="gap:12px;">
+            <div class="field"><label>Printed Name</label><input type="text" id="f_clientSigName"></div>
+            <div class="field"><label>Date</label><input type="date" id="f_clientSigDate"></div>
+          </div>
+        </div>
+        <div class="sig-block">
+          <h3>Company Representative</h3>
+          <div class="sig-pad-slot" id="sigSlotRep" data-role="rep">
+            <div class="sig-empty-cta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg><span>Sign</span></div>
+          </div>
+          <div class="sig-caption">Signature</div>
+          <div class="field-grid cols-2" style="gap:12px;">
+            <div class="field"><label>Printed Name</label><input type="text" id="f_repSigName"></div>
+            <div class="field"><label>Title</label><input type="text" id="f_repSigTitle"></div>
+          </div>
+          <div class="field" style="margin-top:12px;"><label>Date</label><input type="date" id="f_repSigDate"></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div class="toast-stack" id="toastStack"></div>
+
+<!-- Preview overlay -->
+<div class="overlay" id="previewOverlay">
+  <div class="overlay-panel wide">
+    <div class="overlay-head">
+      <h3>Document Preview</h3>
+      <button class="overlay-close" id="closePreview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="overlay-body"><div class="preview-frame-wrap"><iframe id="previewFrame" title="Estimate preview"></iframe></div></div>
+    <div class="overlay-foot">
+      <button class="btn ghost" id="closePreview2">Close</button>
+      <button class="btn dark" id="printFromPreview">Print / Save as PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- History / saved estimates overlay -->
+<div class="overlay" id="savedOverlay">
+  <div class="overlay-panel wide">
+    <div class="overlay-head">
+      <h3>Estimate History</h3>
+      <button class="overlay-close" id="closeSaved"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="overlay-body">
+      <div class="search-input-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" id="historySearch" placeholder="Search by client, address, date, or estimate number…">
+      </div>
+      <div class="saved-list" id="savedList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Logo upload overlay -->
+<div class="overlay" id="logoOverlay">
+  <div class="overlay-panel small">
+    <div class="overlay-head"><h3>Company Logo</h3><button class="overlay-close" id="closeLogo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+    <div class="overlay-body">
+      <div class="logo-upload-body">
+        <div class="logo-upload-preview" id="logoPreviewBox"><span>No logo yet</span></div>
+        <p>Upload a PNG or SVG with a transparent background for the sharpest result in the app header and the PDF, at any resolution up to 4K.</p>
+        <button class="btn dark" id="chooseLogoBtn">Choose Image…</button>
+        <button class="btn ghost hidden" id="removeLogoBtn">Remove Logo</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Signature Pad overlay -->
+<div class="overlay" id="signatureOverlay">
+  <div class="overlay-panel small" style="max-width:520px;">
+    <div class="overlay-head">
+      <h3 id="sigModalTitle">Client Signature</h3>
+      <button class="overlay-close" id="closeSignature"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="overlay-body">
+      <div class="sig-tabs">
+        <button class="sig-tab active" data-tab="draw" id="sigTabDraw">Draw</button>
+        <button class="sig-tab" data-tab="upload" id="sigTabUpload">Upload Image</button>
+      </div>
+
+      <div class="sig-tab-panel" id="sigDrawPanel">
+        <div class="sig-canvas-wrap">
+          <canvas id="sigCanvas"></canvas>
+          <div class="sig-canvas-baseline"></div>
+          <div class="sig-canvas-placeholder" id="sigPlaceholder">Sign here with your finger, stylus, or mouse</div>
+        </div>
+        <div class="sig-pad-actions">
+          <button class="btn ghost" id="sigClearBtn">Clear Signature</button>
+        </div>
+      </div>
+
+      <div class="sig-tab-panel hidden" id="sigUploadPanel">
+        <input type="file" id="sigUploadInput" accept="image/png,image/jpeg" class="hidden">
+        <div class="sig-upload-drop" id="sigUploadDrop">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+          <span id="sigUploadHint">Click to choose a PNG or JPG of the signature</span>
+        </div>
+      </div>
+    </div>
+    <div class="overlay-foot">
+      <button class="btn ghost" id="sigCancelBtn">Cancel</button>
+      <button class="btn dark" id="sigSaveBtn">Save Signature</button>
+    </div>
+  </div>
+</div>
+
+<!-- Clients overlay -->
+<div class="overlay" id="clientsOverlay">
+  <div class="overlay-panel wide">
+    <div class="overlay-head">
+      <h3>Clients</h3>
+      <button class="overlay-close" id="closeClients"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="overlay-body">
+      <div class="search-input-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" id="clientsSearch" placeholder="Search clients by name, phone, or email…">
+      </div>
+      <div id="clientsList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Share overlay -->
+<div class="overlay" id="shareOverlay">
+  <div class="overlay-panel small">
+    <div class="overlay-head">
+      <h3>Share Estimate</h3>
+      <button class="overlay-close" id="closeShare"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="overlay-body">
+      <p style="margin-bottom:14px;">These open your email, messaging, or WhatsApp app with the estimate summary pre-filled. Attach the downloaded PDF for the full document.</p>
+      <div class="share-grid">
+        <button class="share-btn" id="shareEmail"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>Email</button>
+        <button class="share-btn" id="shareSMS"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>SMS</button>
+        <button class="share-btn" id="shareWhatsApp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>WhatsApp</button>
+        <button class="share-btn" id="shareWebShare"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg>More…</button>
+        <button class="share-btn" id="shareCopy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy Summary</button>
+        <button class="share-btn" id="sharePrint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>Print</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Settings overlay -->
+<div class="overlay" id="settingsOverlay">
+  <div class="overlay-panel wide">
+    <div class="overlay-head">
+      <h3>Settings</h3>
+      <button class="overlay-close" id="closeSettings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="overlay-body">
+      <div class="settings-section">
+        <h4>Company Defaults</h4>
+        <div class="section-sub" style="margin:0 0 12px;">Pre-fills new estimates. Editing an estimate's own Company Information section only changes that one.</div>
+        <div class="field-grid cols-2">
+          <div class="field"><label>Company Name</label><input type="text" id="set_companyName"></div>
+          <div class="field"><label>Phone</label><input type="tel" id="set_companyPhone"></div>
+          <div class="field"><label>Email</label><input type="email" id="set_companyEmail"></div>
+          <div class="field"><label>Website</label><input type="text" id="set_companyWebsite"></div>
+          <div class="field"><label>License Number</label><input type="text" id="set_licenseNumber"></div>
+          <div class="field"><label>Business Address</label><input type="text" id="set_companyAddress"></div>
+        </div>
+      </div>
+      <div class="settings-section">
+        <h4>Pricing Defaults</h4>
+        <div class="field-grid cols-2">
+          <div class="field"><label>Default Currency</label>
+            <select id="set_currency">
+              <option value="USD">USD — $</option>
+              <option value="EUR">EUR — €</option>
+              <option value="GBP">GBP — £</option>
+              <option value="MXN">MXN — MX$</option>
+              <option value="CAD">CAD — CA$</option>
+            </select>
+          </div>
+          <div class="field"><label>Default Tax Rate (%)</label><input type="number" id="set_taxRate" min="0" step="0.01"></div>
+        </div>
+      </div>
+      <div class="settings-section">
+        <h4>Regional</h4>
+        <div class="field-grid cols-2">
+          <div class="field"><label>Date Format</label>
+            <select id="set_dateFormat">
+              <option value="MDY">MM/DD/YYYY (US)</option>
+              <option value="DMY">DD/MM/YYYY</option>
+              <option value="YMD">YYYY-MM-DD</option>
+            </select>
+          </div>
+          <div class="field"><label>Time Zone <span class="opt">(display only)</span></label><input type="text" id="set_timezone" placeholder="e.g. America/Chicago"></div>
+        </div>
+      </div>
+      <div class="settings-section">
+        <h4>Appearance</h4>
+        <div class="section-sub" style="margin:0 0 12px;">The app keeps its navy design by default — only change this if you want a different accent color.</div>
+        <div class="color-swatches" id="colorSwatches">
+          <div class="color-swatch active" data-color="#0B1F3A" style="background:#0B1F3A;" title="Navy (default)"></div>
+          <div class="color-swatch" data-color="#0F5C4C" style="background:#0F5C4C;" title="Forest"></div>
+          <div class="color-swatch" data-color="#7A2E2E" style="background:#7A2E2E;" title="Brick"></div>
+          <div class="color-swatch" data-color="#4A3B78" style="background:#4A3B78;" title="Plum"></div>
+          <div class="color-swatch" data-color="#1E293B" style="background:#1E293B;" title="Slate"></div>
+        </div>
+      </div>
+      <div class="settings-section" style="margin-bottom:0;">
+        <h4>App Lock</h4>
+        <div class="section-sub" style="margin:0 0 12px;">Require a PIN to open the app on this device. Face ID / Touch ID / fingerprint unlock is offered automatically as a shortcut when your browser and device support it.</div>
+        <label class="switch-wrap" style="margin-bottom:14px;"><label class="switch"><input type="checkbox" id="set_lockEnabled"><span class="switch-slider"></span></label><span class="switch-label" style="text-transform:none;font-weight:600;">Require PIN to open this app</span></label>
+        <div id="pinSetupWrap" class="hidden field-grid cols-2">
+          <div class="field"><label>Set 4–6 Digit PIN</label><input type="password" id="set_pinValue" inputmode="numeric" maxlength="6" placeholder="••••"></div>
+          <div class="field"><label>Confirm PIN</label><input type="password" id="set_pinConfirm" inputmode="numeric" maxlength="6" placeholder="••••"></div>
+        </div>
+      </div>
+    </div>
+    <div class="overlay-foot">
+      <button class="btn ghost" id="settingsCancel">Cancel</button>
+      <button class="btn dark" id="settingsSave">Save Settings</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm overlay -->
+<div class="overlay" id="confirmOverlay">
+  <div class="overlay-panel small">
+    <div class="overlay-head"><h3 id="confirmTitle">Are you sure?</h3></div>
+    <div class="overlay-body"><p id="confirmText"></p></div>
+    <div class="overlay-foot">
+      <button class="btn ghost" id="confirmCancel">Cancel</button>
+      <button class="btn danger" id="confirmOk">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script>
+
+/* =========================================================
+   Local-storage compatibility shim.
+   window.storage is a persistence API provided automatically inside
+   Claude.ai's Artifacts runtime. It does not exist in a normal browser
+   (Live Server, double-clicked file, or any other hosting). This shim
+   detects that case and transparently backs window.storage with the
+   browser's built-in localStorage instead, so Save / History /
+   Duplicate / Delete / Settings / signatures / autosave all keep
+   working when the app runs completely standalone. If the native
+   window.storage IS present (inside Claude.ai), this shim does nothing
+   and steps out of the way.
+========================================================= */
+(function(){
+  if(window.storage) return;
+  const PREFIX = 'bridiant-estimate:';
+  function fullKey(key, shared){ return PREFIX + (shared ? 'shared:' : 'local:') + key; }
+  window.storage = {
+    async get(key, shared){
+      const raw = window.localStorage.getItem(fullKey(key, shared));
+      if(raw === null) throw new Error('Key not found: ' + key);
+      return {key, value: raw, shared: !!shared};
+    },
+    async set(key, value, shared){
+      window.localStorage.setItem(fullKey(key, shared), value);
+      return {key, value, shared: !!shared};
+    },
+    async delete(key, shared){
+      const k = fullKey(key, shared);
+      const existed = window.localStorage.getItem(k) !== null;
+      window.localStorage.removeItem(k);
+      return {key, deleted: existed, shared: !!shared};
+    },
+    async list(prefix, shared){
+      const base = PREFIX + (shared ? 'shared:' : 'local:');
+      const full = base + (prefix || '');
+      const keys = [];
+      for(let i=0;i<window.localStorage.length;i++){
+        const k = window.localStorage.key(i);
+        if(k && k.indexOf(full) === 0) keys.push(k.slice(base.length));
+      }
+      return {keys, prefix, shared: !!shared};
+    }
+  };
+})();
+
+/* =========================================================
+   Bridiant Facility Group — Estimate Builder (Premium SaaS)
+   Vanilla JS, no external dependencies except SheetJS (Excel export).
+========================================================= */
+
+const DEFAULT_LOGO = "data:image/png;base64,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";
+
+const AREA_OPTIONS = ["Kitchen","Bathrooms","Bedrooms","Living Room","Dining Room","Laundry Room","Office","Hallways","Closets","Windows","Inside Windows","Baseboards","Light Fixtures","Ceiling Fans","Floors","Inside Cabinets","Inside Refrigerator","Inside Oven","Other"];
+const ADDON_OPTIONS = [
+  {name:"Inside Refrigerator", price:35},
+  {name:"Inside Oven", price:40},
+  {name:"Inside Cabinets", price:45},
+  {name:"Inside Windows", price:8},
+  {name:"Trash Removal", price:25},
+  {name:"Organization", price:50},
+  {name:"Disinfection", price:60},
+  {name:"Pet Hair Removal", price:35},
+  {name:"Patio Cleaning", price:40},
+  {name:"Other", price:0}
+];
+const CURRENCIES = {USD:{symbol:'$',locale:'en-US'}, EUR:{symbol:'€',locale:'de-DE'}, GBP:{symbol:'£',locale:'en-GB'}, MXN:{symbol:'MX$',locale:'es-MX'}, CAD:{symbol:'CA$',locale:'en-CA'}};
+const PROPERTY_DETAIL_OPTIONS = ["Standard Cleaning","Deep Cleaning","First-Time Cleaning","Recurring Cleaning","One-Time Cleaning","Weekly","Biweekly","Monthly","Move In","Move Out","Post Construction"];
+const SMART_PRICE_LABEL = "Estimated Cleaning Service (Smart Price)";
+const SMART_PRICE_MULT = {'Residential Cleaning':1,'Commercial Cleaning':1.15,'Office Cleaning':1.1,'Deep Cleaning':1.45,'Move In':1.3,'Move Out':1.3,'Post Construction Cleaning':1.7,'Medical Office Cleaning':1.35,'Janitorial Services':1,'Retail Cleaning':1.1,'Airbnb Cleaning':0.9};
+const SECTIONS = [
+  {id:"sec-details", label:"Estimate Details"},
+  {id:"sec-client", label:"Client Information"},
+  {id:"sec-property", label:"Property Information"},
+  {id:"sec-propertydetails", label:"Property Details"},
+  {id:"sec-service", label:"Service Details"},
+  {id:"sec-schedule", label:"Scheduling"},
+  {id:"sec-access", label:"Access Information"},
+  {id:"sec-description", label:"Job Description"},
+  {id:"sec-areas", label:"Areas to Clean"},
+  {id:"sec-addons", label:"Additional Services"},
+  {id:"sec-pricing", label:"Pricing"},
+  {id:"sec-notes", label:"Notes"},
+  {id:"sec-terms", label:"Terms & Conditions"},
+  {id:"sec-company", label:"Company Information"},
+  {id:"sec-signatures", label:"Signatures"},
+];
+
+let rowIdCounter = 0;
+let currentRows = [];
+let storageOk = true;
+let currentLogo = null;
+let addonRowMap = {};
+let clientSignatureData = null;
+let appSettings = {};
+let clientsCache = [];
+let deferredInstallPrompt = null;
+let currentView = 'builder';
+let repSignatureData = null;
+let sigPad = null;
+let sigModalRole = 'client';
+let sigActiveTab = 'draw';
+let sigUploadedDataUrl = null;
+let autosaveTimer = null;
+
+/* ---------- utils ---------- */
+function currencyInfo(){ return CURRENCIES[document.getElementById('f_currency').value] || CURRENCIES.USD; }
+function money(n){
+  n = isFinite(n) ? n : 0;
+  const c = currencyInfo();
+  return c.symbol + n.toLocaleString(c.locale,{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function addDaysISO(days){ const d = new Date(); d.setDate(d.getDate()+days); return d.toISOString().slice(0,10); }
+function el(html){ const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstChild; }
+function showToast(msg, type){
+  const stack = document.getElementById('toastStack');
+  const icons = {
+    ok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+    err: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>',
+    info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>'
+  };
+  const t = el(`<div class="toast ${type||''}">${icons[type]||icons.info}<span></span></div>`);
+  t.querySelector('span').textContent = msg;
+  stack.appendChild(t);
+  setTimeout(()=>{ t.classList.add('leaving'); setTimeout(()=>t.remove(),200); }, 3200);
+}
+function escapeAttr(s){ return (s||'').replace(/"/g,'&quot;'); }
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ---------- dark mode ---------- */
+async function applyTheme(theme){
+  document.documentElement.setAttribute('data-theme', theme);
+  document.getElementById('iconMoon').classList.toggle('hidden', theme==='dark');
+  document.getElementById('iconSun').classList.toggle('hidden', theme!=='dark');
+  document.getElementById('btnDarkToggle').classList.toggle('toggle-on', theme==='dark');
+  try{ await window.storage.set('ui-theme', theme); }catch(e){}
+}
+async function loadTheme(){
+  try{
+    const res = await window.storage.get('ui-theme');
+    applyTheme(res.value === 'dark' ? 'dark' : 'light');
+  }catch(e){ applyTheme('light'); }
+}
+
+/* ---------- logo ---------- */
+function renderLogo(dataUrl){
+  currentLogo = dataUrl || null;
+  const top = document.getElementById('topLogoSlot');
+  const doc = document.getElementById('docLogoSlot');
+  if(dataUrl){
+    top.innerHTML = `<img src="${dataUrl}" alt="Logo">`; top.classList.add('has-logo');
+    doc.innerHTML = `<img src="${dataUrl}" alt="Logo">`; doc.classList.add('has-logo');
+    document.getElementById('logoPreviewBox').innerHTML = `<img src="${dataUrl}" alt="Logo preview">`;
+    document.getElementById('removeLogoBtn').classList.remove('hidden');
+  } else {
+    top.innerHTML = 'LOGO'; top.classList.remove('has-logo');
+    doc.innerHTML = 'YOUR<br>LOGO'; doc.classList.remove('has-logo');
+    document.getElementById('logoPreviewBox').innerHTML = '<span>No logo yet</span>';
+    document.getElementById('removeLogoBtn').classList.add('hidden');
+  }
+}
+async function saveLogo(dataUrl){
+  renderLogo(dataUrl);
+  try{ await window.storage.set('company-logo', dataUrl || ''); }catch(e){ showToast('Logo applied for this session (storage unavailable).', 'info'); }
+}
+async function loadLogo(){
+  try{
+    const res = await window.storage.get('company-logo');
+    if(res && res.value){ renderLogo(res.value); return; }
+  }catch(e){ /* not set yet */ }
+  renderLogo(DEFAULT_LOGO);
+  try{ await window.storage.set('company-logo', DEFAULT_LOGO); }catch(e){}
+}
+function handleLogoFile(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{ saveLogo(reader.result); showToast('Logo updated.', 'ok'); closeOverlay('logoOverlay'); };
+  reader.readAsDataURL(file);
+}
+
+/* ---------- signature pad ---------- */
+function renderSignatureSlot(role){
+  const slot = document.getElementById(role === 'client' ? 'sigSlotClient' : 'sigSlotRep');
+  const data = role === 'client' ? clientSignatureData : repSignatureData;
+  slot.classList.remove('invalid');
+  if(data){
+    slot.classList.add('has-sig');
+    slot.innerHTML = `<img src="${data}" alt="${role} signature">
+      <div class="sig-slot-controls">
+        <button type="button" class="sig-slot-btn edit" title="Edit signature"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+        <button type="button" class="sig-slot-btn remove" title="Remove signature"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>`;
+    slot.querySelector('.edit').addEventListener('click', e=>{ e.stopPropagation(); openSignatureModal(role); });
+    slot.querySelector('.remove').addEventListener('click', e=>{ e.stopPropagation(); removeSignature(role); });
+  } else {
+    slot.classList.remove('has-sig');
+    slot.innerHTML = `<div class="sig-empty-cta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg><span>Sign</span></div>`;
+  }
+}
+function removeSignature(role){
+  if(role === 'client') clientSignatureData = null; else repSignatureData = null;
+  renderSignatureSlot(role);
+  onFormChange();
+  showToast('Signature removed.', 'ok');
+}
+function resizeCanvasElement(canvas){
+  const ratio = Math.max(window.devicePixelRatio || 1, 1);
+  const displayWidth = canvas.offsetWidth || canvas.clientWidth || 500;
+  const displayHeight = canvas.offsetHeight || canvas.clientHeight || 230;
+  canvas.width = Math.round(displayWidth * ratio);
+  canvas.height = Math.round(displayHeight * ratio);
+  const ctx = canvas.getContext('2d');
+  if(!ctx) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.scale(ratio, ratio);
+}
+function initSignaturePad(){
+  const canvas = document.getElementById('sigCanvas');
+  if(typeof SignaturePad === 'undefined'){ return; }
+  // Size the canvas at full device-pixel resolution BEFORE constructing SignaturePad,
+  // so strokes are captured crisply on Retina/iPhone/iPad screens from the very first draw.
+  resizeCanvasElement(canvas);
+  sigPad = new SignaturePad(canvas, {backgroundColor:'rgb(255,255,255)', penColor:'rgb(11,31,58)', minWidth:1, maxWidth:2.6, velocityFilterWeight:0.7});
+  sigPad.addEventListener('beginStroke', ()=>{ document.getElementById('sigPlaceholder').classList.add('hidden'); });
+}
+function resizeSigCanvas(){
+  const canvas = document.getElementById('sigCanvas');
+  if(!canvas) return;
+  const preserved = (sigPad && !sigPad.isEmpty()) ? sigPad.toDataURL('image/png') : null;
+  resizeCanvasElement(canvas);
+  if(sigPad){
+    sigPad.clear();
+    if(preserved){
+      sigPad.fromDataURL(preserved, {width:canvas.offsetWidth, height:canvas.offsetHeight});
+      document.getElementById('sigPlaceholder').classList.add('hidden');
+    }
+  }
+}
+function nextPaint(cb){
+  // double requestAnimationFrame — more reliable than setTimeout across Safari/iOS for
+  // "wait until the browser has actually laid out and painted this frame"
+  requestAnimationFrame(()=> requestAnimationFrame(cb));
+}
+function switchSigTab(tab){
+  sigActiveTab = tab;
+  document.getElementById('sigTabDraw').classList.toggle('active', tab==='draw');
+  document.getElementById('sigTabUpload').classList.toggle('active', tab==='upload');
+  document.getElementById('sigDrawPanel').classList.toggle('hidden', tab!=='draw');
+  document.getElementById('sigUploadPanel').classList.toggle('hidden', tab!=='upload');
+  if(tab==='draw') nextPaint(resizeSigCanvas);
+}
+function openSignatureModal(role){
+  sigModalRole = role;
+  sigUploadedDataUrl = null;
+  document.getElementById('sigModalTitle').textContent = (role==='client' ? 'Client' : 'Representative') + ' Signature';
+  document.getElementById('sigUploadDrop').classList.remove('has-img');
+  document.getElementById('sigUploadDrop').innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg><span id="sigUploadHint">Click to choose a PNG or JPG of the signature</span>`;
+  document.getElementById('signatureOverlay').classList.add('open');
+  nextPaint(()=>{
+    if(!sigPad) initSignaturePad(); else resizeSigCanvas();
+    switchSigTab('draw');
+    document.getElementById('sigPlaceholder').classList.remove('hidden');
+  });
+}
+function saveSignatureFromModal(){
+  let dataUrl = null;
+  if(sigActiveTab === 'draw'){
+    if(!sigPad || sigPad.isEmpty()){ showToast('Please draw a signature before saving.', 'err'); return; }
+    dataUrl = sigPad.toDataURL('image/png');
+  } else {
+    if(!sigUploadedDataUrl){ showToast('Please choose an image of the signature first.', 'err'); return; }
+    dataUrl = sigUploadedDataUrl;
+  }
+  if(sigModalRole === 'client') clientSignatureData = dataUrl; else repSignatureData = dataUrl;
+  renderSignatureSlot(sigModalRole);
+  closeOverlay('signatureOverlay');
+  onFormChange();
+  showToast((sigModalRole==='client' ? 'Client' : 'Representative') + ' signature saved.', 'ok');
+}
+function handleSigUploadFile(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    sigUploadedDataUrl = reader.result;
+    const drop = document.getElementById('sigUploadDrop');
+    drop.classList.add('has-img');
+    drop.innerHTML = `<img src="${sigUploadedDataUrl}" alt="Uploaded signature">`;
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ---------- rail nav ---------- */
+function buildRail(){
+  const list = document.getElementById('railList');
+  list.innerHTML = '';
+  SECTIONS.forEach((s,i)=>{
+    const li = el(`<li><button class="rail-item" data-target="${s.id}"><span class="rail-num"><span>${i+1}</span></span>${s.label}</button></li>`);
+    li.querySelector('button').addEventListener('click', ()=>{ document.getElementById(s.id).scrollIntoView({behavior:'smooth', block:'start'}); });
+    list.appendChild(li);
+  });
+}
+function updateRailActive(){
+  const items = document.querySelectorAll('.rail-item');
+  let activeId = SECTIONS[0].id;
+  const scrollPos = window.scrollY + 140;
+  SECTIONS.forEach(s=>{ const sec = document.getElementById(s.id); if(sec && sec.offsetTop <= scrollPos) activeId = s.id; });
+  items.forEach(it=> it.classList.toggle('active', it.dataset.target === activeId));
+}
+function updateRailProgress(){
+  const items = document.querySelectorAll('.rail-item');
+  let filled = 0;
+  SECTIONS.forEach((s,i)=>{
+    const sec = document.getElementById(s.id);
+    const inputs = sec.querySelectorAll('input[type=text],input[type=email],input[type=tel],input[type=date],input[type=time],input[type=number],select,textarea');
+    const checks = sec.querySelectorAll('.check-item.checked');
+    let hasContent = checks.length > 0;
+    inputs.forEach(inp=>{ if(inp.value && inp.value.trim() !== '') hasContent = true; });
+    if(s.id === 'sec-signatures' && (clientSignatureData || repSignatureData)) hasContent = true;
+    if(hasContent) filled++;
+    items[i].classList.toggle('filled', hasContent);
+  });
+  const pct = Math.round((filled / SECTIONS.length) * 100);
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressPct').textContent = pct + '%';
+}
+
+/* ---------- checkbox grids ---------- */
+function buildAreaGrid(){
+  const grid = document.getElementById('areasGrid');
+  grid.innerHTML = '';
+  AREA_OPTIONS.forEach(opt=>{
+    const item = el(`<label class="check-item"><input type="checkbox" value="${opt}"><span class="check-box"><svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>${opt}</label>`);
+    const input = item.querySelector('input');
+    input.addEventListener('change', ()=>{
+      item.classList.toggle('checked', input.checked);
+      if(opt === 'Other') document.getElementById('wrap_areaOther').classList.toggle('hidden', !input.checked);
+      onFormChange();
+    });
+    grid.appendChild(item);
+  });
+}
+function buildAddonGrid(){
+  const grid = document.getElementById('addonsGrid');
+  grid.innerHTML = '';
+  ADDON_OPTIONS.forEach(opt=>{
+    const hasPrice = opt.name !== 'Other';
+    const item = el(`<label class="check-item ${hasPrice?'with-price':''}" data-addon="${opt.name}">
+      <input type="checkbox" value="${opt.name}">
+      <span class="check-box"><svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+      ${opt.name}
+      ${hasPrice ? `<span class="price-tag">${money(opt.price)}</span><input type="number" class="price-input" value="${opt.price}" step="0.01" min="0">` : ''}
+    </label>`);
+    const input = item.querySelector('input[type=checkbox]');
+    const priceInput = item.querySelector('.price-input');
+    input.addEventListener('change', ()=>{
+      item.classList.toggle('checked', input.checked);
+      if(opt.name === 'Other'){
+        document.getElementById('wrap_addonOther').classList.toggle('hidden', !input.checked);
+      } else {
+        syncAddonRow(opt.name, input.checked, priceInput ? parseFloat(priceInput.value)||0 : opt.price);
+      }
+      onFormChange();
+    });
+    if(priceInput){
+      priceInput.addEventListener('click', e=>e.stopPropagation());
+      priceInput.addEventListener('input', ()=>{
+        item.querySelector('.price-tag').textContent = money(parseFloat(priceInput.value)||0);
+        if(input.checked) syncAddonRow(opt.name, true, parseFloat(priceInput.value)||0);
+      });
+    }
+    grid.appendChild(item);
+  });
+}
+function syncAddonRow(name, checked, price){
+  if(checked){
+    if(addonRowMap[name] && currentRows.find(r=>r.id===addonRowMap[name])){
+      const row = currentRows.find(r=>r.id===addonRowMap[name]);
+      row.price = price; renderRows();
+    } else {
+      const id = 'row' + (++rowIdCounter);
+      currentRows.push({id, description:name, qty:1, price});
+      addonRowMap[name] = id;
+      renderRows();
+    }
+  } else {
+    if(addonRowMap[name]){
+      currentRows = currentRows.filter(r=>r.id !== addonRowMap[name]);
+      delete addonRowMap[name];
+      renderRows();
+    }
+  }
+}
+function buildPropertyDetailsGrid(){
+  const grid = document.getElementById('propertyDetailsGrid');
+  grid.innerHTML = '';
+  PROPERTY_DETAIL_OPTIONS.forEach(opt=>{
+    const item = el(`<label class="check-item"><input type="checkbox" value="${opt}"><span class="check-box"><svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>${opt}</label>`);
+    const input = item.querySelector('input');
+    input.addEventListener('change', ()=>{ item.classList.toggle('checked', input.checked); onFormChange(); });
+    grid.appendChild(item);
+  });
+}
+
+/* ---------- smart pricing ---------- */
+let smartPriceRowId = null;
+function computeSmartPrice(){
+  const sqft = parseFloat(document.getElementById('f_sqft').value) || 0;
+  const bedrooms = parseFloat(document.getElementById('f_bedrooms').value) || 0;
+  const bathrooms = parseFloat(document.getElementById('f_bathrooms').value) || 0;
+  const type = document.getElementById('f_cleaningType').value;
+  if(sqft<=0 && bedrooms<=0 && bathrooms<=0) return 0;
+  const mult = SMART_PRICE_MULT[type] || 1;
+  const base = (sqft * 0.12) + (bedrooms * 18) + (bathrooms * 22);
+  const price = Math.max(base * mult, base > 0 ? 65 : 0);
+  return Math.round(price * 100) / 100;
+}
+function syncSmartPriceRow(price){
+  if(smartPriceRowId && currentRows.find(r=>r.id===smartPriceRowId)){
+    const row = currentRows.find(r=>r.id===smartPriceRowId);
+    row.price = price; renderRows();
+  } else {
+    const id = 'row' + (++rowIdCounter);
+    currentRows.unshift({id, description:SMART_PRICE_LABEL, qty:1, price});
+    smartPriceRowId = id;
+    renderRows();
+  }
+}
+function removeSmartPriceRow(){
+  if(smartPriceRowId){
+    currentRows = currentRows.filter(r=>r.id !== smartPriceRowId);
+    smartPriceRowId = null;
+    renderRows();
+  }
+}
+function updateSmartPricing(){
+  const manual = document.getElementById('f_manualPricing').checked;
+  document.getElementById('smartPricingCard').classList.toggle('manual-active', manual);
+  const price = computeSmartPrice();
+  document.getElementById('smartPriceValue').textContent = money(price);
+  if(!manual){
+    if(price > 0) syncSmartPriceRow(price); else removeSmartPriceRow();
+  }
+}
+
+/* ---------- pricing table ---------- */
+function addRow(data){
+  const id = 'row' + (++rowIdCounter);
+  currentRows.push({id, description: data?.description || '', qty: data?.qty ?? 1, price: data?.price ?? 0});
+  renderRows();
+}
+function removeRow(id){
+  const rowKey = Object.keys(addonRowMap).find(k=>addonRowMap[k]===id);
+  if(rowKey){
+    delete addonRowMap[rowKey];
+    const cb = document.querySelector(`#addonsGrid [data-addon="${CSS.escape(rowKey)}"] input[type=checkbox]`);
+    if(cb){ cb.checked = false; cb.closest('.check-item').classList.remove('checked'); }
+  }
+  currentRows = currentRows.filter(r=>r.id !== id);
+  renderRows();
+}
+function duplicateRow(id){
+  const idx = currentRows.findIndex(r=>r.id===id);
+  if(idx===-1) return;
+  const src = currentRows[idx];
+  const copy = {id:'row'+(++rowIdCounter), description:src.description, qty:src.qty, price:src.price};
+  currentRows.splice(idx+1, 0, copy);
+  renderRows();
+}
+function moveRow(id, dir){
+  const idx = currentRows.findIndex(r=>r.id===id);
+  const newIdx = idx + dir;
+  if(idx===-1 || newIdx<0 || newIdx>=currentRows.length) return;
+  const [item] = currentRows.splice(idx,1);
+  currentRows.splice(newIdx,0,item);
+  renderRows();
+}
+function renderRows(){
+  const tbody = document.getElementById('priceRows');
+  tbody.innerHTML = '';
+  currentRows.forEach((row, i)=>{
+    const tr = el(`
+      <tr data-id="${row.id}">
+        <td><input type="text" class="r-desc" placeholder="Service or item description" value="${escapeAttr(row.description)}"></td>
+        <td><input type="number" class="r-qty num" min="0" step="1" value="${row.qty}" style="text-align:right"></td>
+        <td><input type="number" class="r-price num" min="0" step="0.01" value="${row.price}" style="text-align:right"></td>
+        <td class="row-total num">${money(row.qty*row.price)}</td>
+        <td>
+          <div class="row-actions">
+            <button class="row-act-btn up" title="Move up" ${i===0?'disabled style="opacity:.3"':''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15 12 9 6 15"/></svg></button>
+            <button class="row-act-btn down" title="Move down" ${i===currentRows.length-1?'disabled style="opacity:.3"':''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+            <button class="row-act-btn dup" title="Duplicate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+            <button class="row-act-btn del" title="Remove row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
+          </div>
+        </td>
+      </tr>`);
+    tr.querySelector('.r-desc').addEventListener('input', e=>{ row.description = e.target.value; onFormChange(); });
+    tr.querySelector('.r-qty').addEventListener('input', e=>{ row.qty = parseFloat(e.target.value)||0; renderRows(); });
+    tr.querySelector('.r-price').addEventListener('input', e=>{ row.price = parseFloat(e.target.value)||0; renderRows(); });
+    tr.querySelector('.del').addEventListener('click', ()=> removeRow(row.id));
+    tr.querySelector('.dup').addEventListener('click', ()=> duplicateRow(row.id));
+    tr.querySelector('.up').addEventListener('click', ()=> moveRow(row.id, -1));
+    tr.querySelector('.down').addEventListener('click', ()=> moveRow(row.id, 1));
+    tbody.appendChild(tr);
+  });
+  recalcTotals();
+}
+function recalcTotals(){
+  const subtotal = currentRows.reduce((sum,r)=> sum + (r.qty*r.price), 0);
+  const discountType = document.getElementById('f_discountType').value;
+  const discountValue = parseFloat(document.getElementById('f_discountValue').value) || 0;
+  const discountAmount = discountType === 'percent' ? subtotal * discountValue/100 : discountValue;
+  const afterDiscount = Math.max(subtotal - discountAmount, 0);
+  const taxRate = parseFloat(document.getElementById('f_taxRate').value) || 0;
+  const taxAmount = afterDiscount * taxRate/100;
+  const grandTotal = afterDiscount + taxAmount;
+  document.getElementById('t_subtotal').textContent = money(subtotal);
+  document.getElementById('t_grandTotal').textContent = money(grandTotal);
+  onFormChange();
+  return {subtotal, discountAmount, taxAmount, grandTotal, taxRate, discountType, discountValue};
+}
+
+/* ---------- estimate number generation ---------- */
+async function generateEstimateNumber(){
+  const year = new Date().getFullYear();
+  try{
+    const res = await window.storage.get('estimate-counter').catch(()=>null);
+    let counter = res ? JSON.parse(res.value) : {year, seq:0};
+    if(counter.year !== year) counter = {year, seq:0};
+    counter.seq += 1;
+    await window.storage.set('estimate-counter', JSON.stringify(counter));
+    return `EST-${year}-${String(counter.seq).padStart(4,'0')}`;
+  }catch(e){ storageOk = false; return `EST-${year}-0001`; }
+}
+
+/* ---------- form <-> state ---------- */
+function getFieldIds(){
+  return ["f_estimateNumber","f_date","f_expiration","f_preparedBy","f_status","f_followUpDate","f_followUpNotes",
+  "f_clientName","f_clientCompany","f_clientPhone","f_clientEmail","f_propertyAddress","f_billingAddress","f_city","f_state","f_zip",
+  "f_propertyType","f_sqft","f_condition","f_bedrooms","f_bathrooms","f_kitchens","f_floors","f_livingRooms","f_diningRooms","f_offices","f_windows","f_garage","f_pets","f_occupied","f_postConstruction","f_suppliesIncluded",
+  "f_cleaningType","f_customService",
+  "f_reqDate","f_reqTime","f_duration","f_arrivalWindow","f_contactMethod",
+  "f_gateCode","f_lockboxCode","f_entryInstructions","f_parkingInstructions",
+  "f_description","f_areaOther","f_addonOther",
+  "f_discountValue","f_discountType","f_taxRate","f_currency",
+  "f_notes","f_terms",
+  "f_companyName","f_companyPhone","f_companyEmail","f_companyWebsite","f_licenseNumber","f_companyAddress",
+  "f_clientSigDate","f_clientSigName","f_repSigDate","f_repSigName","f_repSigTitle"];
+}
+function collectState(){
+  const state = {};
+  getFieldIds().forEach(id=>{ const e = document.getElementById(id); if(e) state[id] = e.value; });
+  state.rows = currentRows.map(r=>({description:r.description, qty:r.qty, price:r.price}));
+  state.areas = Array.from(document.querySelectorAll('#areasGrid input:checked')).map(i=>i.value);
+  state.addons = Array.from(document.querySelectorAll('#addonsGrid input:checked')).map(i=>i.value);
+  state.propertyDetails = Array.from(document.querySelectorAll('#propertyDetailsGrid input:checked')).map(i=>i.value);
+  state.manualPricing = document.getElementById('f_manualPricing').checked;
+  state.addonPrices = {};
+  document.querySelectorAll('#addonsGrid .price-input').forEach(inp=>{
+    state.addonPrices[inp.closest('.check-item').dataset.addon] = inp.value;
+  });
+  state.clientSignature = clientSignatureData || '';
+  state.repSignature = repSignatureData || '';
+  state.savedAt = new Date().toISOString();
+  return state;
+}
+function applyState(state){
+  getFieldIds().forEach(id=>{ const e = document.getElementById(id); if(e && state[id] !== undefined) e.value = state[id]; });
+  document.getElementById('wrap_customService').classList.toggle('hidden', document.getElementById('f_cleaningType').value !== '__custom');
+
+  document.querySelectorAll('#addonsGrid .price-input').forEach(inp=>{
+    const name = inp.closest('.check-item').dataset.addon;
+    if(state.addonPrices && state.addonPrices[name] !== undefined){
+      inp.value = state.addonPrices[name];
+      inp.closest('.check-item').querySelector('.price-tag').textContent = money(parseFloat(inp.value)||0);
+    }
+  });
+
+  addonRowMap = {};
+  currentRows = (state.rows||[]).map(r=>({id:'row'+(++rowIdCounter), ...r}));
+  currentRows.forEach(r=>{ if(ADDON_OPTIONS.some(a=>a.name===r.description)) addonRowMap[r.description] = r.id; });
+  smartPriceRowId = null;
+  currentRows.forEach(r=>{ if(r.description === SMART_PRICE_LABEL) smartPriceRowId = r.id; });
+  renderRows();
+
+  document.querySelectorAll('#areasGrid input').forEach(i=>{
+    i.checked = (state.areas||[]).includes(i.value);
+    i.closest('.check-item').classList.toggle('checked', i.checked);
+  });
+  document.getElementById('wrap_areaOther').classList.toggle('hidden', !(state.areas||[]).includes('Other'));
+  document.querySelectorAll('#addonsGrid input[type=checkbox]').forEach(i=>{
+    i.checked = (state.addons||[]).includes(i.value);
+    i.closest('.check-item').classList.toggle('checked', i.checked);
+  });
+  document.getElementById('wrap_addonOther').classList.toggle('hidden', !(state.addons||[]).includes('Other'));
+  document.querySelectorAll('#propertyDetailsGrid input').forEach(i=>{
+    i.checked = (state.propertyDetails||[]).includes(i.value);
+    i.closest('.check-item').classList.toggle('checked', i.checked);
+  });
+  document.getElementById('f_manualPricing').checked = !!state.manualPricing;
+  updateSmartPricing();
+
+  clientSignatureData = state.clientSignature || null;
+  repSignatureData = state.repSignature || null;
+  renderSignatureSlot('client');
+  renderSignatureSlot('rep');
+
+  document.getElementById('estimateNumDisplay').textContent = state.f_estimateNumber || '—';
+  recalcTotals();
+  updateRailProgress();
+}
+function onFormChange(){
+  document.getElementById('estimateNumDisplay').textContent = document.getElementById('f_estimateNumber').value || '—';
+  updateRailProgress();
+  scheduleAutosave();
+}
+function scheduleAutosave(){
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(()=>{ saveDraft(); }, 1500);
+}
+async function saveDraft(){
+  try{ await window.storage.set('estimate-draft', JSON.stringify(collectState())); }catch(e){}
+}
+
+async function blankState(){
+  const num = await generateEstimateNumber();
+  const s = appSettings || {};
+  return {
+    f_estimateNumber: num, f_date: todayISO(), f_expiration: addDaysISO(30), f_preparedBy: '',
+    f_status:'Pending', f_followUpDate:'', f_followUpNotes:'',
+    f_clientName:'', f_clientCompany:'', f_clientPhone:'', f_clientEmail:'',
+    f_propertyAddress:'', f_billingAddress:'', f_city:'', f_state:'TX', f_zip:'',
+    f_propertyType:'', f_sqft:'', f_condition:'', f_bedrooms:'', f_bathrooms:'', f_kitchens:'', f_floors:'', f_livingRooms:'', f_diningRooms:'', f_offices:'', f_windows:'', f_garage:'', f_pets:'', f_occupied:'', f_postConstruction:'', f_suppliesIncluded:'',
+    f_cleaningType:'', f_customService:'',
+    f_reqDate:'', f_reqTime:'', f_duration:'', f_arrivalWindow:'', f_contactMethod:'',
+    f_gateCode:'', f_lockboxCode:'', f_entryInstructions:'', f_parkingInstructions:'',
+    f_description:'', f_areaOther:'', f_addonOther:'',
+    f_discountValue:'0', f_discountType:'fixed', f_taxRate: s.taxRate!==undefined ? String(s.taxRate) : '0', f_currency: s.currency || 'USD',
+    f_notes:'',
+    f_terms:'Estimate valid for 30 days from the date above.\nPayment is due upon completion unless otherwise agreed in writing.\nAdditional work requested after approval may incur additional charges.',
+    f_companyName: s.companyName || 'Bridiant Facility Group', f_companyPhone: s.companyPhone || '', f_companyEmail: s.companyEmail || '', f_companyWebsite: s.companyWebsite || '', f_licenseNumber: s.licenseNumber || '', f_companyAddress: s.companyAddress || '',
+    f_clientSigDate:'', f_clientSigName:'', f_repSigDate:'', f_repSigName:'', f_repSigTitle:'',
+    rows:[{description:'', qty:1, price:0}], areas:[], addons:[], addonPrices:{}, propertyDetails:[], manualPricing:false, clientSignature:'', repSignature:''
+  };
+}
+
+/* ---------- validation ---------- */
+function clearInvalid(){ document.querySelectorAll('.invalid').forEach(e=>e.classList.remove('invalid')); }
+function validateForm(){
+  clearInvalid();
+  const errors = [];
+  const clientName = document.getElementById('f_clientName');
+  const address = document.getElementById('f_propertyAddress');
+  const cleaningType = document.getElementById('f_cleaningType');
+  const customService = document.getElementById('f_customService');
+
+  if(!clientName.value.trim()){ errors.push('Client name is required.'); clientName.classList.add('invalid'); }
+  if(!address.value.trim()){ errors.push('Service address is required.'); address.classList.add('invalid'); }
+
+  const serviceOk = cleaningType.value && (cleaningType.value !== '__custom' || customService.value.trim());
+  if(!serviceOk){
+    errors.push('Please select or describe a service.');
+    cleaningType.classList.add('invalid');
+    if(cleaningType.value === '__custom') customService.classList.add('invalid');
+  }
+
+  const totals = recalcTotals();
+  const hasPricedRow = currentRows.some(r => r.description.trim() && r.qty*r.price > 0);
+  if(!hasPricedRow){
+    errors.push('Add at least one priced line item.');
+    const wrap = document.querySelector('.price-table-wrap');
+    wrap.style.outline = '2px solid var(--err)'; wrap.style.outlineOffset = '2px';
+    setTimeout(()=>{ wrap.style.outline=''; },2400);
+  }
+
+  if(!clientSignatureData){
+    errors.push('The client signature is missing. Please sign before generating the PDF.');
+    document.getElementById('sigSlotClient').classList.add('invalid');
+  }
+  if(!repSignatureData){
+    errors.push('The representative signature is missing. Please sign before generating the PDF.');
+    document.getElementById('sigSlotRep').classList.add('invalid');
+  }
+
+  if(errors.length){
+    showToast(errors[0], 'err');
+    const firstInvalid = document.querySelector('.invalid');
+    if(firstInvalid){ const sec = firstInvalid.closest('section'); if(sec && typeof sec.scrollIntoView === 'function') sec.scrollIntoView({behavior:'smooth', block:'center'}); }
+    return false;
+  }
+  return true;
+}
+
+/* ---------- print document generation ---------- */
+function buildDocumentHTML(){
+  const g = id => (document.getElementById(id)?.value || '').trim();
+  const totals = recalcTotals();
+  const cleaningType = g('f_cleaningType') === '__custom' ? g('f_customService') : g('f_cleaningType');
+  const areas = Array.from(document.querySelectorAll('#areasGrid input:checked')).map(i=>i.value).map(v => v==='Other' && g('f_areaOther') ? g('f_areaOther') : v);
+  const addons = Array.from(document.querySelectorAll('#addonsGrid input[type=checkbox]:checked')).map(i=>i.value).map(v => v==='Other' && g('f_addonOther') ? g('f_addonOther') : v);
+  const propertyDetails = Array.from(document.querySelectorAll('#propertyDetailsGrid input:checked')).map(i=>i.value);
+
+  const rowsHtml = currentRows.filter(r=>r.description.trim() || r.qty*r.price>0).map(r=>`
+    <tr><td>${escapeHtml(r.description)||'&nbsp;'}</td><td class="c">${r.qty}</td><td class="r">${money(r.price)}</td><td class="r">${money(r.qty*r.price)}</td></tr>`).join('')
+    || `<tr><td colspan="4" style="color:#98A2B3;text-align:center;padding:14px;">No line items</td></tr>`;
+
+  const chipList = arr => arr.length ? arr.map(a=>`<span class="chip">${escapeHtml(a)}</span>`).join('') : '<span class="muted">None specified</span>';
+  const fmtDate = v => { if(!v) return '—'; const d=new Date(v+'T00:00:00'); return isNaN(d) ? v : d.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}); };
+  const logoHtml = currentLogo ? `<img class="logo" src="${currentLogo}" alt="Logo">` : `<span class="logo"></span>`;
+
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${g('f_estimateNumber')||'Estimate'}</title>
+  <style>
+    @page{ size letter; margin: 20mm 18mm; }
+    *{box-sizing:border-box;}
+    body{font-family:'Helvetica Neue',Arial,sans-serif;color:#161F2C;margin:0;font-size:10.5pt;line-height:1.5;}
+    .band{background:#0B1F3A;color:#fff;padding:22px 26px;border-radius:10px;display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;}
+    .band .logo{width:46px;height:46px;border-radius:8px;display:inline-block;vertical-align:middle;margin-right:14px;object-fit:contain;background:rgba(255,255,255,0.06);}
+    .band-left{display:flex;align-items:center;}
+    .band h1{font-size:19pt;margin:0 0 2px;font-weight:700;letter-spacing:.2px;}
+    .band .eyebrow{font-size:8.5pt;letter-spacing:2px;color:rgba(255,255,255,.6);text-transform:uppercase;margin-bottom:6px;}
+    .band p{margin:0;font-size:9.5pt;color:rgba(255,255,255,.7);}
+    .band-right{text-align:right;font-size:9pt;}
+    .band-right b{font-size:11pt;letter-spacing:.5px;}
+    .band-right .lbl{display:block;font-size:7.5pt;text-transform:uppercase;letter-spacing:1.5px;color:rgba(255,255,255,.55);margin-bottom:3px;}
+    .meta-row{display:flex;gap:22px;margin-bottom:20px;font-size:9pt;color:#6B7686;flex-wrap:wrap;}
+    .meta-row b{color:#161F2C;}
+    h2.stitle{font-size:9.5pt;text-transform:uppercase;letter-spacing:1.2px;color:#0B1F3A;border-bottom:1.5px solid #E3E7EE;padding-bottom:6px;margin:22px 0 10px;}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:4px 26px;font-size:9.8pt;}
+    .grid2 div span.lbl{display:block;font-size:7.5pt;text-transform:uppercase;letter-spacing:1px;color:#98A2B3;margin-bottom:1px;}
+    p.body-text{font-size:9.8pt;color:#333;white-space:pre-wrap;margin:0;}
+    .chip{display:inline-block;background:#EAF0F8;color:#0B1F3A;border-radius:5px;padding:3px 9px;margin:0 5px 5px 0;font-size:8.7pt;font-weight:600;}
+    .muted{color:#98A2B3;font-size:9pt;}
+    table.ptable{width:100%;border-collapse:collapse;margin-top:6px;}
+    table.ptable th{background:#EAF0F8;color:#0B1F3A;font-size:7.8pt;text-transform:uppercase;letter-spacing:.8px;text-align:left;padding:7px 9px;}
+    table.ptable td{padding:7px 9px;border-bottom:1px solid #E3E7EE;font-size:9.5pt;}
+    table.ptable td.r, table.ptable th.r{text-align:right;}
+    table.ptable td.c, table.ptable th.c{text-align:center;}
+    .totals{width:260px;margin-left:auto;margin-top:8px;font-size:9.8pt;}
+    .totals div{display:flex;justify-content:space-between;padding:4px 0;}
+    .totals .grand{border-top:1.5px solid #0B1F3A;margin-top:4px;padding-top:8px;font-weight:700;font-size:12pt;color:#0B1F3A;}
+    .terms{font-size:8.7pt;color:#6B7686;white-space:pre-wrap;background:#F4F6F9;border-radius:8px;padding:12px 14px;margin-top:6px;}
+    .sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:10px;}
+    .sig-line{border-bottom:1.3px solid #98A2B3;height:34px;margin-bottom:5px;display:flex;align-items:flex-end;}
+    .sig-line img{max-height:56px;max-width:100%;object-fit:contain;}
+    .sig-cap{font-size:7.5pt;text-transform:uppercase;letter-spacing:1px;color:#98A2B3;margin-bottom:14px;}
+    .sig-meta{font-size:9pt;display:flex;gap:20px;}
+    footer{margin-top:26px;padding-top:12px;border-top:1px solid #E3E7EE;font-size:8pt;color:#98A2B3;text-align:center;}
+  </style></head>
+  <body>
+    <div class="band">
+      <div class="band-left">${logoHtml}
+        <div><div class="eyebrow">Service Estimate</div><h1>Bridiant Facility Group</h1><p>Professional Cleaning Services</p></div>
+      </div>
+      <div class="band-right"><span class="lbl">Estimate No.</span><b>${escapeHtml(g('f_estimateNumber'))||'—'}</b></div>
+    </div>
+
+    <div class="meta-row">
+      <span><b>Date:</b> ${fmtDate(g('f_date'))}</span>
+      <span><b>Expires:</b> ${fmtDate(g('f_expiration'))}</span>
+      <span><b>Prepared By:</b> ${escapeHtml(g('f_preparedBy'))||'—'}</span>
+    </div>
+
+    <h2 class="stitle">Client Information</h2>
+    <div class="grid2">
+      <div><span class="lbl">Client Name</span>${escapeHtml(g('f_clientName'))||'—'}</div>
+      <div><span class="lbl">Company</span>${escapeHtml(g('f_clientCompany'))||'—'}</div>
+      <div><span class="lbl">Phone</span>${escapeHtml(g('f_clientPhone'))||'—'}</div>
+      <div><span class="lbl">Email</span>${escapeHtml(g('f_clientEmail'))||'—'}</div>
+      <div style="grid-column:1/-1;"><span class="lbl">Service Address</span>${escapeHtml(g('f_propertyAddress'))}${g('f_city')||g('f_state')||g('f_zip') ? ', '+[g('f_city'),g('f_state'),g('f_zip')].filter(Boolean).join(', ') : ''}</div>
+      ${g('f_billingAddress') ? `<div style="grid-column:1/-1;"><span class="lbl">Billing Address</span>${escapeHtml(g('f_billingAddress'))}</div>` : ''}
+    </div>
+
+    ${(()=>{
+      const propFields = [
+        ['Property Type', g('f_propertyType')],
+        ['Square Footage', g('f_sqft') ? g('f_sqft')+' sq ft' : ''],
+        ['Condition of Property', g('f_condition')],
+        ['Bedrooms', g('f_bedrooms')],
+        ['Bathrooms', g('f_bathrooms')],
+        ['Kitchens', g('f_kitchens')],
+        ['Floors', g('f_floors')],
+        ['Living Rooms', g('f_livingRooms')],
+        ['Dining Rooms', g('f_diningRooms')],
+        ['Offices', g('f_offices')],
+        ['Windows', g('f_windows')],
+        ['Garage', g('f_garage')],
+        ['Pets in Property', g('f_pets')],
+        ['Occupied Property', g('f_occupied')],
+        ['Post Construction', g('f_postConstruction')],
+        ['Supplies Included', g('f_suppliesIncluded')],
+      ].filter(([,v])=>v);
+      if(!propFields.length && !propertyDetails.length) return '';
+      return `<h2 class="stitle">Property Information</h2>
+        ${propFields.length ? `<div class="grid2">${propFields.map(([l,v])=>`<div><span class="lbl">${l}</span>${escapeHtml(String(v))}</div>`).join('')}</div>` : ''}
+        ${propertyDetails.length ? `<div style="margin-top:8px;">${chipList(propertyDetails)}</div>` : ''}`;
+    })()}
+
+    <h2 class="stitle">Service Details</h2>
+    <div class="grid2">
+      <div><span class="lbl">Cleaning Type</span>${escapeHtml(cleaningType)||'—'}</div>
+      <div><span class="lbl">Preferred Contact</span>${escapeHtml(g('f_contactMethod'))||'—'}</div>
+      <div><span class="lbl">Requested Date</span>${fmtDate(g('f_reqDate'))}</div>
+      <div><span class="lbl">Requested Time</span>${escapeHtml(g('f_reqTime'))||'—'}</div>
+      <div><span class="lbl">Estimated Duration</span>${escapeHtml(g('f_duration'))||'—'}</div>
+      <div><span class="lbl">Arrival Window</span>${escapeHtml(g('f_arrivalWindow'))||'—'}</div>
+    </div>
+
+    ${(()=>{
+      const access = [
+        ['Gate Code', g('f_gateCode')],
+        ['Lockbox Code', g('f_lockboxCode')],
+      ].filter(([,v])=>v);
+      const entry = g('f_entryInstructions'); const parking = g('f_parkingInstructions');
+      if(!access.length && !entry && !parking) return '';
+      return `<h2 class="stitle">Access Information</h2>
+        ${access.length ? `<div class="grid2">${access.map(([l,v])=>`<div><span class="lbl">${l}</span>${escapeHtml(v)}</div>`).join('')}</div>` : ''}
+        ${entry ? `<div style="margin-top:6px;"><span class="lbl" style="display:block;font-size:7.5pt;text-transform:uppercase;letter-spacing:1px;color:#98A2B3;margin-bottom:2px;">Entry Instructions</span><p class="body-text">${escapeHtml(entry)}</p></div>` : ''}
+        ${parking ? `<div style="margin-top:6px;"><span class="lbl" style="display:block;font-size:7.5pt;text-transform:uppercase;letter-spacing:1px;color:#98A2B3;margin-bottom:2px;">Parking Instructions</span><p class="body-text">${escapeHtml(parking)}</p></div>` : ''}`;
+    })()}
+
+    ${g('f_description') ? `<h2 class="stitle">Job Description</h2><p class="body-text">${escapeHtml(g('f_description'))}</p>` : ''}
+
+    <h2 class="stitle">Areas to Clean</h2>
+    <div>${chipList(areas)}</div>
+
+    <h2 class="stitle">Additional Services</h2>
+    <div>${chipList(addons)}</div>
+
+    <h2 class="stitle">Pricing</h2>
+    <table class="ptable">
+      <thead><tr><th>Description</th><th class="c">Qty</th><th class="r">Unit Price</th><th class="r">Total</th></tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+    <div class="totals">
+      <div><span>Subtotal</span><span>${money(totals.subtotal)}</span></div>
+      <div><span>Discount</span><span>-${money(totals.discountAmount)}</span></div>
+      <div><span>Tax (${totals.taxRate||0}%)</span><span>${money(totals.taxAmount)}</span></div>
+      <div class="grand"><span>Grand Total</span><span>${money(totals.grandTotal)}</span></div>
+    </div>
+
+    ${g('f_notes') ? `<h2 class="stitle">Notes</h2><p class="body-text">${escapeHtml(g('f_notes'))}</p>` : ''}
+
+    <h2 class="stitle">Terms &amp; Conditions</h2>
+    <div class="terms">${escapeHtml(g('f_terms'))}</div>
+
+    <h2 class="stitle">Company Information</h2>
+    <div class="grid2">
+      <div><span class="lbl">Company Name</span>${escapeHtml(g('f_companyName'))||'—'}</div>
+      <div><span class="lbl">Phone</span>${escapeHtml(g('f_companyPhone'))||'—'}</div>
+      <div><span class="lbl">Email</span>${escapeHtml(g('f_companyEmail'))||'—'}</div>
+      <div><span class="lbl">Website</span>${escapeHtml(g('f_companyWebsite'))||'—'}</div>
+      ${g('f_licenseNumber') ? `<div><span class="lbl">License Number</span>${escapeHtml(g('f_licenseNumber'))}</div>` : ''}
+      <div style="grid-column:1/-1;"><span class="lbl">Business Address</span>${escapeHtml(g('f_companyAddress'))||'—'}</div>
+    </div>
+
+    <h2 class="stitle">Signatures</h2>
+    <div class="sig-grid">
+      <div>
+        <div class="sig-line">${clientSignatureData ? `<img src="${clientSignatureData}" alt="Client signature">` : ''}</div><div class="sig-cap">Client Signature</div>
+        <div class="sig-meta"><span><b>Name:</b> ${escapeHtml(g('f_clientSigName'))||'—'}</span></div>
+        <div class="sig-meta" style="margin-top:4px;"><span><b>Date:</b> ${fmtDate(g('f_clientSigDate'))}</span></div>
+      </div>
+      <div>
+        <div class="sig-line">${repSignatureData ? `<img src="${repSignatureData}" alt="Representative signature">` : ''}</div><div class="sig-cap">Representative Signature</div>
+        <div class="sig-meta"><span><b>Name:</b> ${escapeHtml(g('f_repSigName'))||'—'}</span> &nbsp; <span><b>Title:</b> ${escapeHtml(g('f_repSigTitle'))||'—'}</span></div>
+        <div class="sig-meta" style="margin-top:4px;"><span><b>Date:</b> ${fmtDate(g('f_repSigDate'))}</span></div>
+      </div>
+    </div>
+
+    <footer>${escapeHtml(g('f_companyName'))||'Bridiant Facility Group'} &middot; This estimate was generated electronically and is valid as presented.</footer>
+  </body></html>`;
+}
+
+/* ---------- preview / print actions ---------- */
+function openPreview(){
+  const frame = document.getElementById('previewFrame');
+  frame.srcdoc = buildDocumentHTML();
+  document.getElementById('previewOverlay').classList.add('open');
+}
+function closeOverlay(id){ document.getElementById(id).classList.remove('open'); }
+function printDocument(){
+  if(!validateForm()) return;
+  const iframe = document.createElement('iframe');
+  iframe.style.position='fixed'; iframe.style.right='0'; iframe.style.bottom='0';
+  iframe.style.width='0'; iframe.style.height='0'; iframe.style.border='0';
+  document.body.appendChild(iframe);
+  iframe.srcdoc = buildDocumentHTML();
+  iframe.onload = ()=>{ setTimeout(()=>{ iframe.contentWindow.focus(); iframe.contentWindow.print(); setTimeout(()=> iframe.remove(), 1000); }, 200); };
+}
+
+/* ---------- real PDF generation (html2canvas + jsPDF) ----------
+   Renders the exact same styled document used for Preview into an
+   offscreen iframe (so its embedded <style> never leaks into the app's
+   own CSS), rasterizes it at high resolution, and slices it across
+   Letter-size pages in a real, downloadable PDF file — no print dialog
+   involved. */
+async function generateRealPDF(){
+  if(!validateForm()) return;
+  if(typeof html2canvas === 'undefined' || typeof window.jspdf === 'undefined'){
+    showToast('The PDF engine failed to load — check your internet connection and try again.', 'err');
+    return;
+  }
+  const genBtn = document.getElementById('btnGenerate');
+  const originalLabel = genBtn.innerHTML;
+  genBtn.style.opacity = '0.65'; genBtn.style.pointerEvents = 'none';
+
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.left = '-10000px';
+  iframe.style.top = '0';
+  iframe.style.width = '850px';
+  iframe.style.height = '1100px';
+  iframe.style.border = '0';
+  document.body.appendChild(iframe);
+
+  try{
+    await new Promise((resolve, reject)=>{
+      iframe.onload = resolve;
+      iframe.onerror = reject;
+      iframe.srcdoc = buildDocumentHTML();
+    });
+    // Give web fonts and layout inside the iframe a moment to settle before rasterizing.
+    await new Promise(r=> setTimeout(r, 200));
+    await new Promise(r=> nextPaint(r));
+
+    const target = iframe.contentDocument.body;
+    const canvas = await html2canvas(target, {
+      scale: Math.min(Math.max(window.devicePixelRatio || 2, 2), 3),
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      windowWidth: target.scrollWidth,
+      windowHeight: target.scrollHeight
+    });
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({orientation:'portrait', unit:'pt', format:'letter', compress:true});
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = pageWidth;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    const imgData = canvas.toDataURL('image/png');
+
+    let heightLeft = imgHeight;
+    let position = 0;
+    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
+    heightLeft -= pageHeight;
+    while(heightLeft > 0){
+      position -= pageHeight;
+      pdf.addPage('letter', 'portrait');
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
+      heightLeft -= pageHeight;
+    }
+
+    const num = (document.getElementById('f_estimateNumber').value || 'estimate').trim();
+    pdf.save(`${num}.pdf`);
+    showToast('PDF downloaded.', 'ok');
+  }catch(e){
+    console.error('PDF generation failed:', e);
+    showToast('PDF generation failed — please try again.', 'err');
+  }finally{
+    iframe.remove();
+    genBtn.style.opacity = ''; genBtn.style.pointerEvents = '';
+    genBtn.innerHTML = originalLabel;
+  }
+}
+
+/* ---------- Excel export ---------- */
+function exportExcel(){
+  const g = id => (document.getElementById(id)?.value || '').trim();
+  const totals = recalcTotals();
+  try{
+    if(typeof XLSX === 'undefined') throw new Error('no xlsx lib');
+    const wb = XLSX.utils.book_new();
+
+    const infoRows = [
+      ['Bridiant Facility Group — Service Estimate'],
+      [],
+      ['Estimate Number', g('f_estimateNumber')],
+      ['Date', g('f_date')],
+      ['Expiration Date', g('f_expiration')],
+      ['Prepared By', g('f_preparedBy')],
+      [],
+      ['Client Name', g('f_clientName')],
+      ['Company', g('f_clientCompany')],
+      ['Phone', g('f_clientPhone')],
+      ['Email', g('f_clientEmail')],
+      ['Service Address', g('f_propertyAddress')],
+      ['City/State/ZIP', [g('f_city'),g('f_state'),g('f_zip')].filter(Boolean).join(', ')],
+      [],
+      ['Cleaning Type', g('f_cleaningType')==='__custom' ? g('f_customService') : g('f_cleaningType')],
+    ];
+    const wsInfo = XLSX.utils.aoa_to_sheet(infoRows);
+    wsInfo['!cols'] = [{wch:22},{wch:40}];
+    XLSX.utils.book_append_sheet(wb, wsInfo, 'Estimate Info');
+
+    const priceRows = [['Description','Qty','Unit Price','Total']];
+    currentRows.forEach(r=> priceRows.push([r.description, r.qty, r.price, r.qty*r.price]));
+    priceRows.push([]);
+    priceRows.push(['','','Subtotal', totals.subtotal]);
+    priceRows.push(['','','Discount', -totals.discountAmount]);
+    priceRows.push(['','','Tax', totals.taxAmount]);
+    priceRows.push(['','','Grand Total', totals.grandTotal]);
+    const wsPrice = XLSX.utils.aoa_to_sheet(priceRows);
+    wsPrice['!cols'] = [{wch:34},{wch:8},{wch:12},{wch:12}];
+    XLSX.utils.book_append_sheet(wb, wsPrice, 'Pricing');
+
+    XLSX.writeFile(wb, `${g('f_estimateNumber')||'estimate'}.xlsx`);
+    showToast('Excel file downloaded.', 'ok');
+  }catch(e){
+    exportCSV();
+    showToast('Excel library unavailable — downloaded CSV instead.', 'info');
+  }
+}
+function exportCSV(){
+  const g = id => (document.getElementById(id)?.value || '').trim();
+  const totals = recalcTotals();
+  let csv = 'Description,Qty,Unit Price,Total\n';
+  currentRows.forEach(r=> csv += `"${(r.description||'').replace(/"/g,'""')}",${r.qty},${r.price},${r.qty*r.price}\n`);
+  csv += `,,Subtotal,${totals.subtotal}\n,,Discount,-${totals.discountAmount}\n,,Tax,${totals.taxAmount}\n,,Grand Total,${totals.grandTotal}\n`;
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = `${g('f_estimateNumber')||'estimate'}.csv`; a.click();
+}
+
+/* ---------- save / load / duplicate / delete / clear ---------- */
+async function saveEstimate(silent){
+  const state = collectState();
+  const num = state.f_estimateNumber || ('EST-' + Date.now());
+  try{
+    await window.storage.set('estimate:'+num, JSON.stringify(state), false);
+    const idxRes = await window.storage.get('estimate-index').catch(()=>null);
+    let idx = idxRes ? JSON.parse(idxRes.value) : [];
+    idx = idx.filter(n=>n!==num); idx.unshift(num);
+    await window.storage.set('estimate-index', JSON.stringify(idx), false);
+    if(!silent) showToast('Estimate '+num+' saved.', 'ok');
+    refreshClientsCache();
+  }catch(e){ showToast('Could not save — storage unavailable.', 'err'); }
+}
+async function deleteEstimateByNumber(num){
+  try{
+    await window.storage.delete('estimate:'+num).catch(()=>{});
+    const idxRes = await window.storage.get('estimate-index').catch(()=>null);
+    let idx = idxRes ? JSON.parse(idxRes.value) : [];
+    idx = idx.filter(n=>n!==num);
+    await window.storage.set('estimate-index', JSON.stringify(idx), false).catch(()=>{});
+  }catch(e){ showToast('Could not delete — storage unavailable.', 'err'); }
+}
+let historyCache = [];
+async function loadSavedList(filter){
+  const listEl = document.getElementById('savedList');
+  if(!historyCache.length && !filter){ listEl.innerHTML = '<div class="saved-empty">Loading…</div>'; }
+  try{
+    const idxRes = await window.storage.get('estimate-index').catch(()=>null);
+    const idx = idxRes ? JSON.parse(idxRes.value) : [];
+    if(!idx.length){ listEl.innerHTML = '<div class="saved-empty">No saved estimates yet.</div>'; historyCache=[]; return; }
+    const entries = [];
+    for(const num of idx){
+      try{ const res = await window.storage.get('estimate:'+num); entries.push({num, state: JSON.parse(res.value)}); }catch(e){}
+    }
+    historyCache = entries;
+    renderHistoryList(entries, filter);
+  }catch(e){ listEl.innerHTML = '<div class="saved-empty">Storage unavailable.</div>'; }
+}
+function renderHistoryList(entries, filter){
+  const listEl = document.getElementById('savedList');
+  const q = (filter||'').toLowerCase().trim();
+  const filtered = !q ? entries : entries.filter(({num, state})=>{
+    const service = state.f_cleaningType==='__custom' ? state.f_customService : state.f_cleaningType;
+    return [num, state.f_clientName, state.f_propertyAddress, state.f_date, state.f_city, state.f_clientPhone, state.f_clientEmail, service, state.f_status].join(' ').toLowerCase().includes(q);
+  });
+  if(!filtered.length){ listEl.innerHTML = '<div class="saved-empty">No matching estimates.</div>'; return; }
+  listEl.innerHTML = '';
+  filtered.forEach(({num, state})=>{
+    const statusClass = 'status-' + (state.f_status||'Pending').replace(/\s+/g,'');
+    const item = el(`<div class="saved-item">
+      <div class="saved-item-info"><b>${escapeHtml(num)} <span class="status-badge ${statusClass}" style="margin-left:6px;">${escapeHtml(state.f_status||'Pending')}</span></b><span>${escapeHtml(state.f_clientName||'No client name')} · ${escapeHtml(state.f_propertyAddress||'')} · ${state.f_date||''}</span></div>
+      <div class="saved-item-actions"><button class="load">Load</button><button class="del">Delete</button></div>
+    </div>`);
+    item.querySelector('.load').addEventListener('click', ()=>{
+      applyState(state); closeOverlay('savedOverlay'); showToast('Loaded '+num+'.', 'ok');
+    });
+    item.querySelector('.del').addEventListener('click', async ()=>{
+      await deleteEstimateByNumber(num);
+      loadSavedList(document.getElementById('historySearch').value);
+    });
+    listEl.appendChild(item);
+  });
+}
+async function duplicateEstimate(){
+  const state = collectState();
+  state.f_estimateNumber = await generateEstimateNumber();
+  state.f_date = todayISO(); state.f_expiration = addDaysISO(30);
+  state.f_clientSigDate = ''; state.f_repSigDate = '';
+  applyState(state);
+  await saveEstimate(true);
+  showToast('Duplicated as '+state.f_estimateNumber+'.', 'ok');
+}
+async function deleteCurrentEstimate(){
+  const num = document.getElementById('f_estimateNumber').value;
+  if(!num){ showToast('Nothing to delete yet.', 'info'); return; }
+  await deleteEstimateByNumber(num);
+  showToast('Estimate '+num+' deleted.', 'ok');
+  clearForm();
+}
+async function clearForm(){
+  const state = await blankState();
+  applyState(state);
+  showToast('Form cleared. New estimate ready.', 'ok');
+}
+
+/* ---------- confirm dialog ---------- */
+function confirmDialog(title, text){
+  return new Promise(resolve=>{
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmText').textContent = text;
+    const ov = document.getElementById('confirmOverlay');
+    ov.classList.add('open');
+    const ok = document.getElementById('confirmOk');
+    const cancel = document.getElementById('confirmCancel');
+    function cleanup(result){ ov.classList.remove('open'); ok.removeEventListener('click', onOk); cancel.removeEventListener('click', onCancel); resolve(result); }
+    function onOk(){ cleanup(true); }
+    function onCancel(){ cleanup(false); }
+    ok.addEventListener('click', onOk);
+    cancel.addEventListener('click', onCancel);
+  });
+}
+
+/* ---------- date formatting (internal displays only — PDF format is unchanged) ---------- */
+function formatDateDisplay(v){
+  if(!v) return '—';
+  const d = new Date(v+'T00:00:00');
+  if(isNaN(d)) return v;
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  const yyyy = d.getFullYear();
+  const fmt = (appSettings && appSettings.dateFormat) || 'MDY';
+  if(fmt === 'DMY') return `${dd}/${mm}/${yyyy}`;
+  if(fmt === 'YMD') return `${yyyy}-${mm}-${dd}`;
+  return `${mm}/${dd}/${yyyy}`;
+}
+
+/* ---------- settings ---------- */
+async function loadSettings(){
+  try{
+    const res = await window.storage.get('app-settings');
+    appSettings = res && res.value ? JSON.parse(res.value) : {};
+  }catch(e){ appSettings = {}; }
+}
+function openSettingsOverlay(){
+  const s = appSettings || {};
+  document.getElementById('set_companyName').value = s.companyName || 'Bridiant Facility Group';
+  document.getElementById('set_companyPhone').value = s.companyPhone || '';
+  document.getElementById('set_companyEmail').value = s.companyEmail || '';
+  document.getElementById('set_companyWebsite').value = s.companyWebsite || '';
+  document.getElementById('set_licenseNumber').value = s.licenseNumber || '';
+  document.getElementById('set_companyAddress').value = s.companyAddress || '';
+  document.getElementById('set_currency').value = s.currency || 'USD';
+  document.getElementById('set_taxRate').value = s.taxRate !== undefined ? s.taxRate : '';
+  document.getElementById('set_dateFormat').value = s.dateFormat || 'MDY';
+  document.getElementById('set_timezone').value = s.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+  document.querySelectorAll('.color-swatch').forEach(sw=> sw.classList.toggle('active', sw.dataset.color === (s.accentColor || '#0B1F3A')));
+  document.getElementById('set_lockEnabled').checked = !!(s.lock && s.lock.enabled);
+  document.getElementById('pinSetupWrap').classList.toggle('hidden', !document.getElementById('set_lockEnabled').checked);
+  document.getElementById('set_pinValue').value = '';
+  document.getElementById('set_pinConfirm').value = '';
+  document.getElementById('settingsOverlay').classList.add('open');
+}
+async function sha256Hex(text){
+  const enc = new TextEncoder().encode(text);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function saveSettingsFromOverlay(){
+  const lockEnabled = document.getElementById('set_lockEnabled').checked;
+  const pin = document.getElementById('set_pinValue').value.trim();
+  const pinConfirm = document.getElementById('set_pinConfirm').value.trim();
+  let lock = (appSettings && appSettings.lock) || {enabled:false, hash:''};
+  if(lockEnabled){
+    if(pin || pinConfirm){
+      if(!/^\d{4,6}$/.test(pin)){ showToast('PIN must be 4–6 digits.', 'err'); return; }
+      if(pin !== pinConfirm){ showToast('PINs do not match.', 'err'); return; }
+      lock = {enabled:true, hash: await sha256Hex(pin)};
+    } else if(!lock.hash){
+      showToast('Please set a PIN to enable App Lock.', 'err'); return;
+    } else {
+      lock = {enabled:true, hash: lock.hash};
+    }
+  } else {
+    lock = {enabled:false, hash: lock.hash || ''};
+  }
+  appSettings = {
+    companyName: document.getElementById('set_companyName').value.trim(),
+    companyPhone: document.getElementById('set_companyPhone').value.trim(),
+    companyEmail: document.getElementById('set_companyEmail').value.trim(),
+    companyWebsite: document.getElementById('set_companyWebsite').value.trim(),
+    licenseNumber: document.getElementById('set_licenseNumber').value.trim(),
+    companyAddress: document.getElementById('set_companyAddress').value.trim(),
+    currency: document.getElementById('set_currency').value,
+    taxRate: document.getElementById('set_taxRate').value,
+    dateFormat: document.getElementById('set_dateFormat').value,
+    timezone: document.getElementById('set_timezone').value.trim(),
+    accentColor: (document.querySelector('.color-swatch.active')||{}).dataset?.color || '#0B1F3A',
+    lock
+  };
+  try{ await window.storage.set('app-settings', JSON.stringify(appSettings)); }catch(e){}
+  closeOverlay('settingsOverlay');
+  showToast('Settings saved.', 'ok');
+}
+
+/* ---------- clients ---------- */
+function estimateTotalFromState(state){
+  const subtotal = (state.rows||[]).reduce((sum,r)=> sum + ((r.qty||0)*(r.price||0)), 0);
+  const discountValue = parseFloat(state.f_discountValue)||0;
+  const discountAmount = state.f_discountType === 'percent' ? subtotal*discountValue/100 : discountValue;
+  const afterDiscount = Math.max(subtotal - discountAmount, 0);
+  const taxAmount = afterDiscount * (parseFloat(state.f_taxRate)||0)/100;
+  return afterDiscount + taxAmount;
+}
+async function getAllSavedEstimates(){
+  try{
+    const idxRes = await window.storage.get('estimate-index').catch(()=>null);
+    const idx = idxRes ? JSON.parse(idxRes.value) : [];
+    const entries = [];
+    for(const num of idx){
+      try{ const res = await window.storage.get('estimate:'+num); entries.push({num, state: JSON.parse(res.value)}); }catch(e){}
+    }
+    return entries;
+  }catch(e){ return []; }
+}
+async function refreshClientsCache(){
+  const entries = await getAllSavedEstimates();
+  const map = {};
+  entries.forEach(({num, state})=>{
+    if(!state.f_clientName) return;
+    const key = (state.f_clientPhone || state.f_clientEmail || state.f_clientName).toLowerCase();
+    if(!map[key] || (state.savedAt||'') > (map[key].savedAt||'')){
+      map[key] = {key, name:state.f_clientName, company:state.f_clientCompany, phone:state.f_clientPhone, email:state.f_clientEmail,
+        address:state.f_propertyAddress, city:state.f_city, state_:state.f_state, zip:state.f_zip,
+        billingAddress:state.f_billingAddress, savedAt:state.savedAt, lastEstimateNum:num};
+    }
+  });
+  let favRes = null;
+  try{ favRes = await window.storage.get('client-favorites'); }catch(e){}
+  const favs = favRes && favRes.value ? JSON.parse(favRes.value) : [];
+  clientsCache = Object.values(map).map(c=>({...c, favorite: favs.includes(c.key)}))
+    .sort((a,b)=> (b.savedAt||'').localeCompare(a.savedAt||''));
+  return clientsCache;
+}
+async function toggleClientFavorite(key){
+  let favRes = null;
+  try{ favRes = await window.storage.get('client-favorites'); }catch(e){}
+  let favs = favRes && favRes.value ? JSON.parse(favRes.value) : [];
+  if(favs.includes(key)) favs = favs.filter(k=>k!==key); else favs.unshift(key);
+  try{ await window.storage.set('client-favorites', JSON.stringify(favs)); }catch(e){}
+  await refreshClientsCache();
+}
+function renderClientAutocomplete(query){
+  const box = document.getElementById('clientAutocomplete');
+  const q = query.toLowerCase().trim();
+  if(q.length < 2){ box.classList.remove('open'); box.innerHTML=''; return; }
+  const matches = clientsCache.filter(c=> c.name.toLowerCase().includes(q)).slice(0,6);
+  if(!matches.length){ box.classList.remove('open'); box.innerHTML=''; return; }
+  box.innerHTML = '';
+  matches.forEach(c=>{
+    const item = el(`<div class="autocomplete-item"><b>${escapeHtml(c.name)}</b><span>${escapeHtml(c.phone||c.email||c.address||'')}</span></div>`);
+    item.addEventListener('click', ()=>{
+      document.getElementById('f_clientName').value = c.name;
+      document.getElementById('f_clientCompany').value = c.company || '';
+      document.getElementById('f_clientPhone').value = c.phone || '';
+      document.getElementById('f_clientEmail').value = c.email || '';
+      document.getElementById('f_propertyAddress').value = c.address || '';
+      document.getElementById('f_city').value = c.city || '';
+      document.getElementById('f_state').value = c.state_ || '';
+      document.getElementById('f_zip').value = c.zip || '';
+      if(c.billingAddress) document.getElementById('f_billingAddress').value = c.billingAddress;
+      box.classList.remove('open'); box.innerHTML = '';
+      onFormChange();
+      showToast('Filled in from ' + c.name + '\u2019s last estimate.', 'ok');
+    });
+    box.appendChild(item);
+  });
+  box.classList.add('open');
+}
+async function renderClientsOverlay(filter){
+  const listEl = document.getElementById('clientsList');
+  listEl.innerHTML = '<div class="dash-empty">Loading…</div>';
+  const clients = clientsCache.length ? clientsCache : await refreshClientsCache();
+  const q = (filter||'').toLowerCase().trim();
+  const filtered = !q ? clients : clients.filter(c=> [c.name,c.phone,c.email,c.address].join(' ').toLowerCase().includes(q));
+  const sorted = [...filtered].sort((a,b)=> (b.favorite - a.favorite) || (b.savedAt||'').localeCompare(a.savedAt||''));
+  if(!sorted.length){ listEl.innerHTML = '<div class="dash-empty">No clients found.</div>'; return; }
+  listEl.innerHTML = '';
+  sorted.forEach(c=>{
+    const item = el(`<div class="client-list-item">
+      <div class="client-list-item-info"><b>${escapeHtml(c.name)}</b><span>${escapeHtml(c.phone||'')}${c.phone&&c.email?' · ':''}${escapeHtml(c.email||'')}${(c.phone||c.email)&&c.address?' · ':''}${escapeHtml(c.address||'')}</span></div>
+      <button class="client-fav-btn ${c.favorite?'is-fav':''}" title="Toggle favorite"><svg viewBox="0 0 24 24" fill="${c.favorite?'currentColor':'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></button>
+    </div>`);
+    item.querySelector('.client-fav-btn').addEventListener('click', async ()=>{
+      await toggleClientFavorite(c.key);
+      renderClientsOverlay(document.getElementById('clientsSearch').value);
+    });
+    listEl.appendChild(item);
+  });
+}
+
+/* ---------- dashboard ---------- */
+function switchView(view){
+  currentView = view;
+  document.getElementById('builderView').classList.toggle('hidden', view!=='builder');
+  document.getElementById('dashboardView').classList.toggle('hidden', view!=='dashboard');
+  if(view==='dashboard') renderDashboard();
+}
+async function renderDashboard(){
+  const entries = await getAllSavedEstimates();
+  const total = entries.length;
+  const byStatus = s => entries.filter(e=> (e.state.f_status||'Pending')===s).length;
+  const accepted = byStatus('Accepted') + byStatus('Completed');
+  const pending = byStatus('Pending') + byStatus('Sent') + byStatus('In Progress');
+  const declined = byStatus('Declined');
+  const revenueEstimated = entries.reduce((sum,e)=> sum + estimateTotalFromState(e.state), 0);
+  const revenueAccepted = entries.filter(e=> ['Accepted','Completed'].includes(e.state.f_status)).reduce((sum,e)=> sum + estimateTotalFromState(e.state), 0);
+  const thisMonthKey = new Date().toISOString().slice(0,7);
+  const monthly = entries.filter(e=> (e.state.f_date||'').startsWith(thisMonthKey)).length;
+
+  const cards = [
+    ['Total Estimates', total, ''],
+    ['Accepted', accepted, 'accent-ok'],
+    ['Pending', pending, ''],
+    ['Declined', declined, 'accent-err'],
+    ['Revenue Estimated', money(revenueEstimated), ''],
+    ['Revenue Accepted', money(revenueAccepted), 'accent-ok'],
+    ['This Month', monthly, ''],
+    ['Recent Clients', clientsCache.length || (await refreshClientsCache()).length, ''],
+  ];
+  const cardsEl = document.getElementById('dashCards');
+  cardsEl.innerHTML = cards.map(([label,val,cls])=>`<div class="dash-card ${cls}"><div class="dc-label">${label}</div><div class="dc-value">${val}</div></div>`).join('');
+
+  const today = todayISO();
+  const followups = entries.filter(e=> e.state.f_followUpDate && e.state.f_followUpDate <= today && !['Completed','Declined'].includes(e.state.f_status))
+    .sort((a,b)=> (a.state.f_followUpDate||'').localeCompare(b.state.f_followUpDate||''));
+  const fuEl = document.getElementById('dashFollowups');
+  if(!followups.length){ fuEl.innerHTML = '<div class="dash-empty">Nothing due right now.</div>'; }
+  else {
+    fuEl.innerHTML = followups.slice(0,8).map(e=>`<div class="dash-followup-item"><span><b>${escapeHtml(e.state.f_clientName||e.num)}</b> — ${escapeHtml(e.state.f_followUpNotes||'Follow up')}</span><span class="fu-date">${formatDateDisplay(e.state.f_followUpDate)}</span></div>`).join('');
+  }
+
+  const clients = clientsCache.length ? clientsCache : await refreshClientsCache();
+  const clEl = document.getElementById('dashClients');
+  if(!clients.length){ clEl.innerHTML = '<div class="dash-empty">No clients yet — save your first estimate to see them here.</div>'; }
+  else {
+    clEl.innerHTML = clients.slice(0,8).map(c=>`<div class="dash-client-item"><span>${c.favorite?'★ ':''}<b>${escapeHtml(c.name)}</b> — ${escapeHtml(c.phone||c.email||'')}</span><span style="color:var(--muted);font-size:11.5px;">${formatDateDisplay((c.savedAt||'').slice(0,10))}</span></div>`).join('');
+  }
+}
+
+/* ---------- share ---------- */
+function buildShareSummary(){
+  const g = id => (document.getElementById(id)?.value || '').trim();
+  const totals = recalcTotals();
+  const service = g('f_cleaningType')==='__custom' ? g('f_customService') : g('f_cleaningType');
+  return `Service Estimate ${g('f_estimateNumber')} — Bridiant Facility Group\n`+
+    `Client: ${g('f_clientName')}\nService: ${service||'—'}\nAddress: ${g('f_propertyAddress')}\n`+
+    `Total: ${money(totals.grandTotal)}\nValid until: ${g('f_expiration')}`;
+}
+function shareViaEmail(){
+  const g = id => (document.getElementById(id)?.value || '').trim();
+  const subject = encodeURIComponent(`Service Estimate ${g('f_estimateNumber')} — Bridiant Facility Group`);
+  const body = encodeURIComponent(buildShareSummary());
+  window.location.href = `mailto:${encodeURIComponent(g('f_clientEmail')||'')}?subject=${subject}&body=${body}`;
+}
+function shareViaSMS(){
+  const g = id => (document.getElementById(id)?.value || '').trim();
+  const body = encodeURIComponent(buildShareSummary());
+  window.location.href = `sms:${encodeURIComponent(g('f_clientPhone')||'')}?&body=${body}`;
+}
+function shareViaWhatsApp(){
+  const body = encodeURIComponent(buildShareSummary());
+  window.open(`https://wa.me/?text=${body}`, '_blank');
+}
+async function shareViaWebShare(){
+  if(navigator.share){
+    try{ await navigator.share({title:'Service Estimate', text: buildShareSummary()}); }
+    catch(e){ /* user cancelled */ }
+  } else {
+    showToast('Native sharing isn\u2019t available in this browser — try Copy Summary instead.', 'info');
+  }
+}
+async function shareCopySummary(){
+  try{ await navigator.clipboard.writeText(buildShareSummary()); showToast('Summary copied to clipboard.', 'ok'); }
+  catch(e){ showToast('Could not copy — your browser blocked clipboard access.', 'err'); }
+}
+
+/* ---------- PIN lock ---------- */
+function buildLockKeypad(){
+  const pad = document.getElementById('lockKeypad');
+  pad.innerHTML = '';
+  const keys = ['1','2','3','4','5','6','7','8','9','','0','back'];
+  keys.forEach(k=>{
+    if(k===''){ pad.appendChild(el('<div></div>')); return; }
+    const btn = el(`<button type="button" class="lock-key ${k==='back'?'ghost':''}">${k==='back'?'⌫':k}</button>`);
+    btn.addEventListener('click', ()=> handleLockKey(k));
+    pad.appendChild(btn);
+  });
+}
+let lockEntry = '';
+let lockResolve = null;
+function handleLockKey(k){
+  if(k==='back'){ lockEntry = lockEntry.slice(0,-1); }
+  else if(lockEntry.length < 6){ lockEntry += k; }
+  renderLockDots();
+  if(lockEntry.length >= 4){
+    setTimeout(()=> verifyLockEntry(), 120);
+  }
+}
+function renderLockDots(){
+  const dots = document.getElementById('lockDots');
+  dots.innerHTML = '';
+  for(let i=0;i<6;i++){
+    dots.appendChild(el(`<div class="lock-dot ${i<lockEntry.length?'filled':''}"></div>`));
+  }
+}
+async function verifyLockEntry(){
+  const hash = await sha256Hex(lockEntry);
+  const lock = (appSettings && appSettings.lock) || {};
+  if(hash === lock.hash){
+    lockEntry = '';
+    document.getElementById('lockScreen').classList.add('hidden');
+    if(lockResolve) lockResolve();
+  } else if(lockEntry.length >= 6 || lockEntry.length === 4){
+    document.getElementById('lockError').textContent = 'Incorrect PIN — try again.';
+    lockEntry = '';
+    renderLockDots();
+    setTimeout(()=>{ document.getElementById('lockError').textContent=''; }, 2200);
+  }
+}
+async function tryBiometricUnlock(){
+  try{
+    if(!window.PublicKeyCredential) return;
+    const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+    if(!available) return;
+    const btn = document.getElementById('lockBiometricBtn');
+    btn.classList.remove('hidden');
+    btn.onclick = async ()=>{
+      try{
+        await navigator.credentials.get({
+          publicKey:{
+            challenge: crypto.getRandomValues(new Uint8Array(32)),
+            userVerification:'required',
+            timeout:30000
+          }
+        });
+        document.getElementById('lockScreen').classList.add('hidden');
+        if(lockResolve) lockResolve();
+      }catch(e){ /* user cancelled or no credential registered — fall back to PIN silently */ }
+    };
+  }catch(e){ /* WebAuthn unsupported — PIN-only, no error shown */ }
+}
+function showLockScreen(){
+  return new Promise(resolve=>{
+    lockResolve = resolve;
+    lockEntry = '';
+    document.getElementById('lockLogo').innerHTML = currentLogo ? `<img src="${currentLogo}" alt="logo">` : '';
+    buildLockKeypad();
+    renderLockDots();
+    document.getElementById('lockScreen').classList.remove('hidden');
+    tryBiometricUnlock();
+  });
+}
+async function checkAppLock(){
+  await loadSettings();
+  const lock = appSettings && appSettings.lock;
+  if(lock && lock.enabled && lock.hash){
+    await showLockScreen();
+  }
+}
+
+/* ---------- PWA install + service worker ---------- */
+function initPWA(){
+  window.addEventListener('beforeinstallprompt', (e)=>{
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    document.getElementById('btnInstall').classList.remove('hidden');
+  });
+  document.getElementById('btnInstall').addEventListener('click', async ()=>{
+    if(!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    document.getElementById('btnInstall').classList.add('hidden');
+  });
+  window.addEventListener('appinstalled', ()=>{
+    document.getElementById('btnInstall').classList.add('hidden');
+    showToast('Bridiant Estimate installed.', 'ok');
+  });
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('service-worker.js').catch(()=>{ /* not hosted yet, or unsupported in this preview — safe to ignore */ });
+  }
+}
+
+/* ---------- init ---------- */
+async function init(){
+  buildRail();
+  buildAreaGrid();
+  buildAddonGrid();
+  buildPropertyDetailsGrid();
+  await loadTheme();
+  await loadLogo();
+  await checkAppLock();
+  initPWA();
+  refreshClientsCache();
+
+  document.getElementById('f_cleaningType').addEventListener('change', e=>{
+    document.getElementById('wrap_customService').classList.toggle('hidden', e.target.value !== '__custom');
+    onFormChange();
+    updateSmartPricing();
+  });
+  ['f_sqft','f_bedrooms','f_bathrooms'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', updateSmartPricing);
+  });
+  document.getElementById('f_manualPricing').addEventListener('change', updateSmartPricing);
+
+  document.querySelectorAll('input,select,textarea').forEach(elm=>{
+    if(elm.closest('.check-grid')) return;
+    elm.addEventListener('input', ()=>{ elm.classList.remove('invalid'); onFormChange(); });
+    elm.addEventListener('change', onFormChange);
+  });
+  ['f_discountValue','f_discountType','f_taxRate'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', recalcTotals);
+    document.getElementById(id).addEventListener('change', recalcTotals);
+  });
+  document.getElementById('f_currency').addEventListener('change', ()=>{ buildAddonGrid(); renderRows(); onFormChange(); });
+
+  document.getElementById('addRowBtn').addEventListener('click', ()=> addRow());
+
+  document.getElementById('btnPreview').addEventListener('click', ()=>{ if(!validateForm()) return; openPreview(); });
+  document.getElementById('btnGenerate').addEventListener('click', generateRealPDF);
+  document.getElementById('closePreview').addEventListener('click', ()=>closeOverlay('previewOverlay'));
+  document.getElementById('closePreview2').addEventListener('click', ()=>closeOverlay('previewOverlay'));
+  document.getElementById('printFromPreview').addEventListener('click', ()=>{
+    const frame = document.getElementById('previewFrame');
+    frame.contentWindow.focus(); frame.contentWindow.print();
+  });
+
+  document.getElementById('btnSave').addEventListener('click', ()=> saveEstimate(false));
+  document.getElementById('btnHistory').addEventListener('click', ()=>{ document.getElementById('savedOverlay').classList.add('open'); document.getElementById('historySearch').value=''; loadSavedList(); });
+  document.getElementById('btnSearch').addEventListener('click', ()=>{ document.getElementById('savedOverlay').classList.add('open'); loadSavedList(); setTimeout(()=>document.getElementById('historySearch').focus(),100); });
+  document.getElementById('closeSaved').addEventListener('click', ()=> closeOverlay('savedOverlay'));
+  document.getElementById('historySearch').addEventListener('input', e=> renderHistoryList(historyCache, e.target.value));
+
+  document.getElementById('btnDarkToggle').addEventListener('click', ()=>{
+    const cur = document.documentElement.getAttribute('data-theme');
+    applyTheme(cur === 'dark' ? 'light' : 'dark');
+  });
+
+  const btnMore = document.getElementById('btnMore');
+  const moreMenu = document.getElementById('moreMenu');
+  btnMore.addEventListener('click', e=>{ e.stopPropagation(); moreMenu.classList.toggle('open'); });
+  document.addEventListener('click', ()=> moreMenu.classList.remove('open'));
+
+  document.getElementById('mnuDuplicate').addEventListener('click', ()=>{ moreMenu.classList.remove('open'); duplicateEstimate(); });
+  document.getElementById('mnuPrint').addEventListener('click', ()=>{ moreMenu.classList.remove('open'); printDocument(); });
+  document.getElementById('mnuExcel').addEventListener('click', ()=>{ moreMenu.classList.remove('open'); exportExcel(); });
+  document.getElementById('mnuLogo').addEventListener('click', ()=>{ moreMenu.classList.remove('open'); document.getElementById('logoOverlay').classList.add('open'); });
+  document.getElementById('mnuDelete').addEventListener('click', async ()=>{
+    moreMenu.classList.remove('open');
+    const ok = await confirmDialog('Delete this estimate?', 'This permanently removes it from your saved history. This cannot be undone.');
+    if(ok) deleteCurrentEstimate();
+  });
+  document.getElementById('mnuClear').addEventListener('click', async ()=>{
+    moreMenu.classList.remove('open');
+    const ok = await confirmDialog('Clear this form?', 'This will remove all unsaved information and start a new estimate. This cannot be undone.');
+    if(ok) clearForm();
+  });
+
+  [document.getElementById('topLogoSlot'), document.getElementById('docLogoSlot')].forEach(elm=>{
+    elm.addEventListener('click', ()=> document.getElementById('logoOverlay').classList.add('open'));
+  });
+  document.getElementById('closeLogo').addEventListener('click', ()=> closeOverlay('logoOverlay'));
+  document.getElementById('chooseLogoBtn').addEventListener('click', ()=> document.getElementById('logoFileInput').click());
+  document.getElementById('logoFileInput').addEventListener('change', e=> handleLogoFile(e.target.files[0]));
+  document.getElementById('removeLogoBtn').addEventListener('click', ()=>{ saveLogo(null); showToast('Logo removed.', 'ok'); });
+
+  document.getElementById('sigSlotClient').addEventListener('click', ()=> openSignatureModal('client'));
+  document.getElementById('sigSlotRep').addEventListener('click', ()=> openSignatureModal('rep'));
+  document.getElementById('closeSignature').addEventListener('click', ()=> closeOverlay('signatureOverlay'));
+  document.getElementById('sigCancelBtn').addEventListener('click', ()=> closeOverlay('signatureOverlay'));
+  document.getElementById('sigSaveBtn').addEventListener('click', saveSignatureFromModal);
+  document.getElementById('sigClearBtn').addEventListener('click', ()=>{
+    if(sigPad) sigPad.clear();
+    document.getElementById('sigPlaceholder').classList.remove('hidden');
+  });
+  document.getElementById('sigTabDraw').addEventListener('click', ()=> switchSigTab('draw'));
+  document.getElementById('sigTabUpload').addEventListener('click', ()=> switchSigTab('upload'));
+  document.getElementById('sigUploadDrop').addEventListener('click', ()=> document.getElementById('sigUploadInput').click());
+  document.getElementById('sigUploadInput').addEventListener('change', e=> handleSigUploadFile(e.target.files[0]));
+  window.addEventListener('resize', ()=>{
+    if(document.getElementById('signatureOverlay').classList.contains('open') && sigActiveTab==='draw') resizeSigCanvas();
+  });
+
+  document.getElementById('btnDashboard').addEventListener('click', ()=> switchView(currentView==='dashboard' ? 'builder' : 'dashboard'));
+  document.getElementById('btnNewFromDash').addEventListener('click', async ()=>{ await clearForm(); switchView('builder'); });
+
+  document.getElementById('mnuClients').addEventListener('click', ()=>{
+    moreMenu.classList.remove('open');
+    document.getElementById('clientsOverlay').classList.add('open');
+    document.getElementById('clientsSearch').value = '';
+    renderClientsOverlay();
+  });
+  document.getElementById('closeClients').addEventListener('click', ()=> closeOverlay('clientsOverlay'));
+  document.getElementById('clientsSearch').addEventListener('input', e=> renderClientsOverlay(e.target.value));
+
+  document.getElementById('mnuShare').addEventListener('click', ()=>{ moreMenu.classList.remove('open'); document.getElementById('shareOverlay').classList.add('open'); });
+  document.getElementById('closeShare').addEventListener('click', ()=> closeOverlay('shareOverlay'));
+  document.getElementById('shareEmail').addEventListener('click', ()=>{ shareViaEmail(); closeOverlay('shareOverlay'); });
+  document.getElementById('shareSMS').addEventListener('click', ()=>{ shareViaSMS(); closeOverlay('shareOverlay'); });
+  document.getElementById('shareWhatsApp').addEventListener('click', ()=>{ shareViaWhatsApp(); closeOverlay('shareOverlay'); });
+  document.getElementById('shareWebShare').addEventListener('click', ()=>{ shareViaWebShare(); });
+  document.getElementById('shareCopy').addEventListener('click', ()=> shareCopySummary());
+  document.getElementById('sharePrint').addEventListener('click', ()=>{ closeOverlay('shareOverlay'); printDocument(); });
+
+  document.getElementById('mnuCsv').addEventListener('click', ()=>{ moreMenu.classList.remove('open'); exportCSV(); showToast('CSV file downloaded.', 'ok'); });
+
+  document.getElementById('mnuSettings').addEventListener('click', ()=>{ moreMenu.classList.remove('open'); openSettingsOverlay(); });
+  document.getElementById('settingsCancel').addEventListener('click', ()=> closeOverlay('settingsOverlay'));
+  document.getElementById('closeSettings').addEventListener('click', ()=> closeOverlay('settingsOverlay'));
+  document.getElementById('settingsSave').addEventListener('click', saveSettingsFromOverlay);
+  document.getElementById('set_lockEnabled').addEventListener('change', e=>{
+    document.getElementById('pinSetupWrap').classList.toggle('hidden', !e.target.checked);
+  });
+  document.querySelectorAll('.color-swatch').forEach(sw=>{
+    sw.addEventListener('click', ()=>{
+      document.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('active'));
+      sw.classList.add('active');
+    });
+  });
+
+  document.getElementById('f_clientName').addEventListener('input', e=> renderClientAutocomplete(e.target.value));
+  document.addEventListener('click', e=>{
+    if(!e.target.closest('.autocomplete-wrap')) document.getElementById('clientAutocomplete').classList.remove('open');
+  });
+
+  document.querySelectorAll('.overlay').forEach(ov=>{
+    ov.addEventListener('click', e=>{ if(e.target === ov) ov.classList.remove('open'); });
+  });
+
+  window.addEventListener('scroll', updateRailActive, {passive:true});
+
+  let state = null;
+  try{
+    const draft = await window.storage.get('estimate-draft').catch(()=>null);
+    if(draft && draft.value) state = JSON.parse(draft.value);
+  }catch(e){}
+  if(!state) state = await blankState();
+  applyState(state);
+  if(!storageOk){ showToast('Working offline — history needs storage access.', 'info'); }
+}
+
+init().catch(err=>{
+  console.error('Bridiant Estimate failed to start:', err);
+  try{ showToast('The app hit a problem while loading — check the browser console for details.', 'err'); }catch(e2){}
+});
+
+</script>
+</body>
+</html>
