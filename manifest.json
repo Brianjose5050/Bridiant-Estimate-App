@@ -2,7 +2,7 @@
   "name": "Bridiant Facility Group",
   "short_name": "Bridiant Estimate",
   "description": "Professional cleaning service estimates for Bridiant Facility Group.",
-  "start_url": "./bridiant-service-estimate.html",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",

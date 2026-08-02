@@ -9,9 +9,9 @@
      visitors automatically get the update instead of a stale cached copy.
 */
 
-const CACHE_VERSION = 'bridiant-v1';
+const CACHE_VERSION = 'bridiant-v2';
 const CORE_ASSETS = [
-  './bridiant-service-estimate.html',
+  './index.html',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png'
