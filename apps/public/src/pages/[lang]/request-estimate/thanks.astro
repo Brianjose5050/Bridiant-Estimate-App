@@ -10,6 +10,9 @@ const { lang } = Astro.params as { lang: Lang };
 const title = text('thanks.title', lang);
 const next = text('thanks.next', lang);
 const note = text('thanks.note', lang);
+const welcomeTitle = text('thanks.welcomeTitle', lang);
+const welcomeLead = text('thanks.welcomeLead', lang);
+const welcomeCta = text('thanks.welcomeCta', lang);
 const refLabel = lang === 'en' ? 'Your reference' : 'Su referencia';
 ---
 <Base lang={lang} title={`${ui('nav.requestEstimate', lang)} · Bridiant Facility Group`} description={title ?? ''} page={`${pages.request}thanks/`} showMobileBar={false}>
@@ -22,21 +25,23 @@ const refLabel = lang === 'en' ? 'Your reference' : 'Su referencia';
         {note && <p>{note}</p>}
       </div>
       <p class="help">{lang === 'en' ? 'Photos can be sent by replying to your confirmation email or by calling us.' : 'Puede enviar fotos respondiendo a su correo de confirmación o llamándonos.'}</p>
+
+      {welcomeTitle && welcomeCta && (
+        <section class="invite reveal" aria-labelledby="invite-title">
+          <span class="eyebrow" style="margin:0">Bridiant</span>
+          <h2 id="invite-title" class="serif">{welcomeTitle}</h2>
+          {welcomeLead && <p class="lead" style="font-size:1rem">{welcomeLead}</p>}
+          <a class="btn btn--primary invite__cta" href={`/${lang}/welcome/`}>{welcomeCta} →</a>
+        </section>
+      )}
+
       <div class="actions">
         <a class="btn btn--ghost" href={`/${lang}/services/`}>{ui('nav.services', lang)}</a>
-        <a class="btn btn--ghost" href={`/${lang}/welcome/`}>{ui('nav.welcome', lang)}</a>
       </div>
     </div>
   </section>
 </Base>
 <script>
-  const ref = new URLSearchParams(window.location.search).get('ref');
-  if (ref && /^BFG-[0-9A-Z]{6}$/.test(ref)) {
-    const box = document.querySelector<HTMLElement>('[data-reference-box]');
-    const out = document.querySelector<HTMLElement>('[data-reference]');
-    if (box && out) {
-      out.textContent = ref;
-      box.hidden = false;
-    }
-  }
+  import { initThanks } from '../../../client/thanks';
+  initThanks();
 </script>

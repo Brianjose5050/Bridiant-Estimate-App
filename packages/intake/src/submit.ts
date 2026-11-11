@@ -43,6 +43,10 @@ export async function submitEstimateRequest(
   raw: unknown,
   deps: { store: RequestStore; now?: () => Date; random?: () => number },
 ): Promise<SubmitResult> {
+  // Honeypot first: a filled hidden field gets a generic answer that names no field.
+  if (raw && typeof raw === 'object' && String((raw as { website?: unknown }).website ?? '') !== '') {
+    return { status: 'invalid', issues: [{ field: 'form', code: 'invalid' }] };
+  }
   const parsed = estimateRequestSchema.safeParse(raw);
   if (!parsed.success) {
     return {

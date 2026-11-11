@@ -1,41 +1,45 @@
 ---
 import Base from '../../../layouts/Base.astro';
-import PageHero from '../../../components/PageHero.astro';
 import Tag from '../../../components/Tag.astro';
-import { LANGS, MODE, href, pages, ready, text, ui, type Lang } from '../../../lib/site';
+import { LANGS, MODE, pages, ready, text, ui, type Lang } from '../../../lib/site';
 
 export function getStaticPaths() {
-  return LANGS.filter((lang) => ready(lang, ['welcome.intro', 'welcome.packetNote'])).map((lang) => ({ params: { lang } }));
+  return LANGS.filter((lang) => ready(lang, ['welcome.heroTitle', 'welcome.heroLead'])).map((lang) => ({ params: { lang } }));
 }
+
 const { lang } = Astro.params as { lang: Lang };
-const intro = text('welcome.intro', lang);
-const packetNote = text('welcome.packetNote', lang);
-const cards = [
-  { title: ui('nav.services', lang), body: lang === 'en' ? 'What each service includes, room by room.' : 'Qué incluye cada servicio, habitación por habitación.', href: href(lang, pages.services) },
-  { title: ui('nav.standards', lang), body: lang === 'en' ? 'The checklist behind every visit.' : 'La lista de verificación detrás de cada visita.', href: href(lang, pages.standards) },
-  { title: lang === 'en' ? 'Questions and answers' : 'Preguntas y respuestas', body: lang === 'en' ? '[OWNER TO PROVIDE: FAQ content, EN]' : '[OWNER TO PROVIDE: contenido de preguntas frecuentes, ES]', href: null },
-];
+const heroTitle = text('welcome.heroTitle', lang) ?? '';
+const heroLead = text('welcome.heroLead', lang) ?? '';
+const chaptersTitle = text('welcome.chaptersTitle', lang) ?? '';
+const noChapters = text('welcome.noChapters', lang) ?? '';
+const eyebrow = lang === 'en' ? 'Welcome Packet' : 'Paquete de bienvenida';
+const openDoc = lang === 'en' ? 'Open document (PDF)' : 'Abrir documento (PDF)';
 ---
-<Base lang={lang} title={`${ui('nav.welcome', lang)} · Bridiant Facility Group`} description={intro ?? ''} page={pages.welcome}>
-  <PageHero eyebrow={lang === 'en' ? 'Customers' : 'Clientes'} title={ui('nav.welcome', lang)} lead={intro ?? undefined} />
-  <section class="section" style="padding-top:0">
-    <div class="wrap" style="display:grid;gap:32px">
+<Base lang={lang} title={`${heroTitle} · Bridiant Facility Group`} description={heroLead} page={pages.welcome}>
+  <section class="section section--navy wc-hero">
+    <div class="wrap">
       {MODE === 'preview' && <Tag lang={lang} />}
-      <div class="grid grid--3">
-        {cards.map((card) => card.href ? (
-          <a class="card" href={card.href}>
-            <h3>{card.title}</h3>
-            <p>{card.body}</p>
-            <span class="more">→</span>
-          </a>
-        ) : (
-          <div class="card">
-            <h3>{card.title}</h3>
-            <p>{card.body}</p>
-          </div>
-        ))}
-      </div>
-      {packetNote && <p class="note">{packetNote}</p>}
+      <span class="eyebrow reveal">{eyebrow}</span>
+      <h1 class="serif reveal reveal--delay-1">{heroTitle}</h1>
+      <p class="lead reveal reveal--delay-2">{heroLead}</p>
     </div>
   </section>
+
+  <section class="wc-index" aria-label={chaptersTitle}>
+    <div class="wrap">
+      <nav class="wc-chips" id="wc-chips" aria-label={chaptersTitle} hidden></nav>
+    </div>
+  </section>
+
+  <section class="section wc-body">
+    <div class="wrap">
+      <p class="muted" id="wc-status">{noChapters}</p>
+      <div id="wc-chapters" class="wc-chapters" data-lang={lang} data-open-doc={openDoc}></div>
+    </div>
+  </section>
+
+  <script>
+    import { initWelcome } from '../../../client/welcome';
+    initWelcome();
+  </script>
 </Base>

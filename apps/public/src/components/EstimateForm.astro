@@ -45,13 +45,14 @@ const messages = {
   emailUs: L('Email us instead', 'Escríbanos por correo'),
   photosSelected: L('photo(s) selected. Photos are sent after your request is received.', 'foto(s) seleccionadas. Las fotos se envían después de recibir su solicitud.'),
   photoTooLarge: L('This photo is larger than 15 MB. Please choose a smaller one.', 'Esta foto supera 15 MB. Elija una más pequeña.'),
+  photoType: L('Only JPEG, PNG, WebP, or HEIC photos can be sent.', 'Solo se pueden enviar fotos JPEG, PNG, WebP o HEIC.'),
   copyFileName: 'bridiant-estimate-request.txt',
   emailAddress,
   emailSubject: L('Estimate request', 'Solicitud de estimado'),
   endpointConfigured: false,
 };
 ---
-<form class="form" id="estimate-form" novalidate data-endpoint="" data-lang={lang}>
+<form class="form" id="estimate-form" novalidate data-endpoint="/api/estimate" data-lang={lang}>
   {intro && <p class="lead" style="font-size:1.02rem">{intro}</p>}
 
   <fieldset data-field="services">
@@ -236,9 +237,13 @@ const messages = {
 
     photoInput.addEventListener('change', () => {
       const files = Array.from(photoInput.files ?? []);
+      const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+      const badType = files.some((f) => !allowed.includes(f.type) && !/\.(jpe?g|png|webp|heic|heif)$/i.test(f.name));
       const tooLarge = files.some((f) => f.size > 15 * 1024 * 1024);
       photoCount.textContent = files.length > 0 ? `${files.length} ${m.photosSelected}` : '';
-      photoCount.textContent += tooLarge ? ` ${m.photoTooLarge}` : '';
+      if (badType) photoCount.textContent += ' ' + (m.photoType as string);
+      if (tooLarge) photoCount.textContent += ' ' + (m.photoTooLarge as string);
+      photoInput.setCustomValidity(badType || tooLarge ? 'invalid' : '');
     });
 
     const setError = (key: string, message: string | null) => {
@@ -343,11 +348,11 @@ const messages = {
       submitBtn.disabled = true;
       showStatus(`<strong>${m.sending}</strong>`);
       try {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
+        // Multipart: the validated answers travel as JSON in one field, photos as files.
+        const body = new FormData();
+        body.append('payload', JSON.stringify(payload));
+        for (const file of Array.from(photoInput.files ?? [])) body.append('photos', file, file.name);
+        const response = await fetch(endpoint, { method: 'POST', body });
         const result = (await response.json()) as { status: string; reference?: string };
         if (result.status === 'received' && result.reference) {
           try {

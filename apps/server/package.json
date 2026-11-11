@@ -1,0 +1,20 @@
+{
+  "name": "@bridiant/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local server: estimate intake, private owner panel, welcome center API. Not deployed.",
+  "main": "./dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "admin:create": "node dist/cli/create-admin.js"
+  },
+  "dependencies": {
+    "@bridiant/intake": "*",
+    "busboy": "^1.6.0"
+  },
+  "devDependencies": {
+    "@types/busboy": "^1.5.4"
+  }
+}

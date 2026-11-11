@@ -35,3 +35,7 @@ Thumbs.db
 apps/public/dist/
 apps/public/.astro/
 apps/public/public/preview-media/
+
+# Local server data: database, private photos, documents, keys. Never commit.
+apps/server/data/
+apps/server/dist/

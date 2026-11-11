@@ -1,10 +1,26 @@
 {
   "files": [],
   "references": [
-    { "path": "./packages/ui" },
-    { "path": "./packages/i18n" },
-    { "path": "./packages/pricing" },
-    { "path": "./packages/intake" },
-    { "path": "./packages/gallery" }
+    {
+      "path": "./packages/ui"
+    },
+    {
+      "path": "./packages/i18n"
+    },
+    {
+      "path": "./packages/pricing"
+    },
+    {
+      "path": "./packages/intake"
+    },
+    {
+      "path": "./packages/gallery"
+    },
+    {
+      "path": "./packages/welcome"
+    },
+    {
+      "path": "./apps/server"
+    }
   ]
 }
