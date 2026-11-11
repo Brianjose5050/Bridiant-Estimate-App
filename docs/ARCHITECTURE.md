@@ -1,6 +1,8 @@
 # Bridiant Facility Group — Website & Admin Architecture
 
-**Revision 2 — incorporates owner decisions. Status: awaiting owner review. No application code, no paid service, no paid plan has been activated.**
+**Revision 3 — owner clarifications added in §19 (authoritative where they conflict with earlier text). Implementation NOT approved. No application code written, no deployment, no paid service or plan activated, no integration connected, no Google Drive or credentials created, nothing pushed or published.**
+
+> **Security risk notice:** the existing public estimate application (`index.html.html`) exposes internal pricing logic and rate data to anyone who views its source. Until its exposure is addressed, it must not be used as a public tool. See §19.7.
 
 Tagline: *The Standard, Quietly Kept.*
 
@@ -733,7 +735,7 @@ Recommendation: start on the free plan as requested, accept the risks in §15 it
 
 ---
 
-## 18. Decisions and inputs needed before implementation
+## 18. Decisions and inputs needed before implementation (superseded by §20)
 
 1. **Confirm the revised Welcome Center tiers** in §5.2 and the packet process in §5.3.
 2. **Spanish review:** who will review Spanish text (owner, or a fluent reviewer)? Pricing, legal, and contract wording needs a fluent reviewer.
@@ -753,7 +755,396 @@ Recommendation: start on the free plan as requested, accept the risks in §15 it
 
 ---
 
-## 19. Summary
+## 19. Revision 3 clarifications (authoritative)
+
+These clarifications supersede conflicting text in Revisions 1 and 2. Nothing in this section authorizes implementation, deployment, paid service activation, integration, or publishing.
+
+### 19.1 Source materials and no invented content
+
+Rules:
+
+- **R1 — No invented business content.** The system and seed data contain no company information, service descriptions, included or excluded tasks, policies, prices, rates, discounts, credits, form answers, FAQs, welcome-packet text, testimonials, licenses, or insurance statements that the owner has not supplied and approved. Each such field is seeded as a placeholder, for example `[OWNER TO PROVIDE: service description, Office Cleaning, EN]`.
+- **R2 — Placeholders never publish.** The publish gate rejects any content containing a placeholder marker. Public build scans also fail the build if a placeholder marker reaches public output.
+- **R3 — Owner-supplied means pending until approved.** Material from the owner enters as "owner-supplied, pending approval." Each item needs its own explicit approval (no bulk approval of a whole section). The approval records approver, time, and source file reference in the audit log.
+- **R4 — Replacing published content needs approval.** Changing already-published text, a photo in an existing slot, or a document file creates a pending change with a before-and-after view. Nothing auto-publishes, and no owner-provided content replaces published content without that approval.
+- **R5 — The system drafts nothing for publication.** If an assistant proposes wording (for example, Spanish text or FAQ wording for review), it is stored as "draft — not approved," cannot be published, and is presented as a proposal the owner can accept, edit, or reject item by item.
+- **R6 — Business facts come only from approved values.** Phone, email, address, hours, service area, turnaround text, legal name, and any license or insurance statement stay as placeholders until supplied and approved.
+- **R7 — Pricing is empty at launch.** The system ships with zero rate rules. No quote calculation can be made until the owner enters rates and approves a rate version. Discounts and credits likewise start empty.
+
+Missing items are listed in the checklist (§20.2).
+
+### 19.2 Google Drive backups: complete process
+
+#### A. Components and responsibilities
+
+| Component | Role | Who controls it |
+|---|---|---|
+| GitHub Actions workflow `backup.yml` | Runs the nightly job on the default branch only | Repo owner |
+| Read-only Postgres role `backup_reader` | Can read data for the dump; cannot write or delete | Owner creates it in Supabase |
+| `age` key pair | Encrypts dumps; public key in repo, private key with owner only | Owner generates it on own computer |
+| rclone with Google token (scope `drive.file`) | Uploads to one Drive folder; can only see files it created | Owner authorizes in own Google account |
+| Google Drive folder "Bridiant Backups" | Stores encrypted dumps, manifests, storage copies | Owner's Google account (2-Step Verification on) |
+| Restore workstation | Owner's computer with Docker and PostgreSQL for drills and restores | Owner |
+
+#### B. One-time setup (only after approval; the owner performs each step)
+
+1. Owner generates the `age` key pair on their own computer. The public key is committed to `backup/age-recipient.txt`. The private key is never sent to chat, the repo, GitHub, Drive, or any AI environment.
+2. Owner enables 2-Step Verification on the Google account and creates the Drive folder.
+3. Owner creates the `backup_reader` role in Supabase with read-only access to the `public`, `auth`, and `storage` schemas. Its password is generated randomly (32+ characters) and saved only as GitHub secret `SUPABASE_BACKUP_URL`.
+4. Owner configures rclone on their own computer and saves the resulting config as GitHub secret `RCLONE_CONFIG_BRIDIANT`.
+5. Owner performs a manual test run and a manual restore drill (§19.2 D) before the schedule is enabled.
+
+#### C. Nightly run (steps in order)
+
+1. Checkout the default branch only, with third-party actions pinned to full commit hashes.
+2. Install pinned versions of PostgreSQL client tools, `age`, and `rclone`.
+3. Dump: `pg_dump --format=custom --no-owner` for schemas `public`, `auth`, and `storage` (object metadata). Supabase internal schemas are excluded.
+4. Validate: the file is non-empty, `pg_restore --list` succeeds, and per-table row counts are recorded. Failure stops the run.
+5. Encrypt with `age` to the public recipient key. The plaintext dump is deleted immediately.
+6. Hash the encrypted file (SHA-256) and write a manifest: timestamp, workflow run ID, byte size, hash, and row counts. The manifest contains no personal data.
+7. Upload as `db-YYYY-MM-DD.dump.age.partial`. Verify size and hash with `rclone check`, rename to the final name, then upload the manifest last. Files ending in `.partial` are ignored by restore and pruning.
+8. Storage copy: `rclone copy` (never `sync`, so nothing is deleted from Drive) of new objects only. Objects are immutable with random IDs. A transfer cap (set below the free egress allowance, §13) stops the copy before the limit.
+9. Retention, run only after a verified upload: keep the last 30 daily dumps and the first dump of each month for 12 months. Deletion uses an explicit file list.
+10. Write `last-success.txt` with the timestamp and run ID.
+11. Failures exit non-zero. Secrets are never printed (`set +x`, masked values).
+
+#### D. Restore procedures
+
+**Drill (monthly, on the owner's computer; no production change):**
+1. Download the latest `.dump.age` file and its manifest. Verify the SHA-256 hash against the manifest.
+2. Decrypt with the private key (`age -d -i <key file>`).
+3. Restore into a local PostgreSQL container with `pg_restore`.
+4. Compare row counts with the manifest and check the latest submission date is recent.
+5. Record the result in the owner's drill log. Delete the local decrypted copy.
+
+**Recovery to a new Supabase project (only when needed):**
+1. Create a new Supabase project. The free plan allows two active projects (verify current limit).
+2. Apply the schema from the repo migrations.
+3. Restore data from the decrypted dump with `pg_restore --data-only`, including the `auth` schema (users and MFA factors) and `storage` metadata.
+4. Re-upload storage objects from Drive to matching paths with rclone.
+5. Update environment variables, redeploy the public and admin sites and functions, and verify end to end.
+6. Create a new `backup_reader` role and new GitHub secrets. Re-run the backup job.
+7. Expected recovery time: several hours, mostly manual. Expected data loss: up to the last successful nightly dump.
+
+**Corrupted or unreadable backup:** use the previous day's dump. Retention keeps 30 days.
+
+### 19.2 E. Credential protection
+
+| Credential | Protection | If exposed or lost |
+|---|---|---|
+| `age` private key | Owner-only. Two offline copies: password manager and a printed copy in a secure location. Never in repo, GitHub, Drive, chat, or AI environments | Lost: existing backups cannot be decrypted, so keep two copies. Exposed: generate a new key pair, use it for new backups, and keep the old private key until its backups expire |
+| `age` public key | Committed to the repo (not secret) | Not applicable |
+| `SUPABASE_BACKUP_URL` (GitHub secret) | Read-only role, unique password, rotated every 90 days and on suspicion. GitHub secrets are write-only and are not shown in logs | Revoke the role password in Supabase; create a new one; update the secret |
+| `RCLONE_CONFIG_BRIDIANT` (GitHub secret) | `drive.file` scope limits access to files the app created. Revocable under Google Account → Security → Third-party access | Owner revokes the grant in Google, which stops backups visibly (§19.2 F) |
+| Google account | Owner's account with 2-Step Verification. Recovery codes stored offline | Owner recovers the account using Google's recovery process |
+| Workflow file | Changes to the default branch need review (branch protection and code-owner review, if available on the owner's plan; verify) | A malicious change could read secrets during a run. Review every workflow change |
+
+Additional controls: the workflow does not run for pull requests from forks, so secrets are not exposed to outside code. Backup contents include personal data and pricing, so the Drive folder is treated as sensitive. Google cannot read dumps encrypted with `age`.
+
+Limitation: anyone who controls the GitHub repository's default branch can change the workflow. Branch protection and a second reviewer reduce that risk. This is a single-owner risk until staff access is added.
+
+### 19.2 F. If GitHub Actions fails
+
+| Cause | How it appears | Protection | Owner response |
+|---|---|---|---|
+| Workflow error (bad change, tool version) | Failed run | Partial files ignored; prior backups untouched; retention runs only after success | Read the run log; fix; re-run manually |
+| Supabase unreachable or paused | Dump step fails | Same as above | Restore the project in the Supabase dashboard; re-run |
+| Drive token revoked or expired | Upload step fails | Same as above | Re-authorize rclone; update secret; re-run |
+| Drive quota full | Upload fails | Retention pruning helps; storage copy stops at cap | Free space in Drive or accept fewer storage copies; re-run |
+| Free Actions minutes used up | Run does not start | Previous backups intact | Wait for monthly reset, or run the manual backup procedure below |
+| Scheduled workflows disabled by GitHub after inactivity | No run appears | No new backups | Re-enable the workflow; run manually |
+| GitHub outage | No run | No new backups | Wait; run manually if urgent |
+
+**Detection.** Failed runs send GitHub notification email to the repo owner (verify notification settings). `last-success.txt` shows the most recent successful run. The owner checks the Drive folder weekly (calendar reminder recommended). The monthly drill confirms the newest file is recent. Worst-case detection gap if GitHub stops scheduling silently: about one month, which is why the weekly check is required.
+
+**Manual backup procedure (when Actions cannot run):** on the owner's computer, run the same dump-encrypt-upload steps, with the same `age` public key and the same Drive folder. Record the manual run in the drill log. The manual procedure is written as a runbook in Phase 5 and is not created now.
+
+**Effect on the data-loss window.** Every hour without a successful backup adds to the loss window. The owner is told the timestamp of the last successful backup at each drill.
+
+### 19.3 Free-tier reliability
+
+#### A. Principles
+
+- **P1.** The site never shows "received" unless a durable store has acknowledged the write.
+- **P2.** No submission is dropped silently. Each failure is visible to the customer, the owner, or both.
+- **P3.** The customer can keep a copy of what they entered.
+- **P4.** Free-tier limits are documented, monitored, and not accepted silently. The system is not production-ready while the gates in §19.3 F remain open.
+
+#### B. Intake path
+
+1. The public form posts to a **Cloudflare Worker** `intake` (Workers free plan; verify limits). The Worker validates the schema using the shared zod package, verifies Turnstile server-side, applies rate limits, and assigns an **idempotency key** generated in the browser.
+2. **Primary write:** Worker → Supabase intake function → `submissions`. On success it returns the reference and the customer sees the received message.
+3. **Fallback write** (if the primary fails or times out, about 5 seconds): the Worker writes the same payload to a **Cloudflare D1 table `intake_queue`** and returns a reference with the same received message. Photos are not accepted in fallback; the customer is told to send them later through the confirmation email or by phone.
+4. **Owner alert:** each fallback write triggers an owner email containing the reference, the time, and a notice that the request is queued. The email contains no answers.
+5. **Drain:** a scheduled Worker runs every 15 minutes and moves queued rows into Supabase. A row is deleted from D1 only after Supabase confirms the record with the same idempotency key. Rows older than 24 hours in the queue trigger an alert.
+6. **Why D1 and not email as the fallback store:** the Resend free plan caps sending at 100 emails per day (§13). A full email fallback would fail on exactly the busy day it is needed, and it would spread personal data into mailboxes. Email is used only for notifications.
+7. **Last resort** (Cloudflare or Worker outage): the form cannot submit. It shows the owner's phone and email (placeholders until supplied), offers "Save a copy" (a text file of the answers), and keeps the draft on the device for 7 days.
+
+**Decision for owner:** D1 queue (recommended) or email-only fallback (accepts the daily cap and personal data in email). See §20.1 D2.
+
+#### C. Detecting a paused or unavailable database
+
+- **Client-side detection.** Any error, non-success response, or timeout from the intake sends the visitor to the "not received" state (§19.3 D). The form never treats an unknown result as success.
+- **Worker health probe.** A scheduled Worker probe runs every 5 minutes and reads a non-sensitive health value from Supabase. It writes nothing. Three consecutive failures over about 15 minutes set `fallback_mode` (Workers KV or a D1 flag; verify limits) and email the owner: "Database unavailable. Requests are being queued."
+- **Paused project.** A failing probe with the Supabase dashboard showing the project paused means the free plan's inactivity pause. The runbook: restore the project in the dashboard, confirm the probe passes, and let the drain run.
+- **Not a keep-alive.** The probe is not a reliable way to prevent pausing. Whether it counts as activity is unverified. Pause prevention depends on owner use (weekly admin login) or on Supabase Pro (§20.1 D3).
+- **Ambiguous timeouts.** If the response is lost after the database has stored the row, the retry with the same idempotency key returns the existing reference, so no duplicates are created.
+
+#### D. Customer messages (all in the visitor's language)
+
+| State | When | Message and actions |
+|---|---|---|
+| **Received** | Primary or fallback write confirmed | "Thank you. We received your request. Reference [ref]. We will contact you within [OWNER TO PROVIDE turnaround]." Shows the "after request" resources (§19.4) |
+| **Not received** | Any failure before a durable write | "We could not send your request just now. Your answers are still saved on this device. Please try again in a few minutes, or call [OWNER TO PROVIDE phone] or email [OWNER TO PROVIDE email]." Buttons: Try again · Save a copy (text file) · Email us (a prefilled email without photos) |
+| **Uncertain** | Timeout after sending | "We may already have your request. Please check your email for a confirmation. If you have not received one, call [phone]." Retry uses the same idempotency key, so it cannot create a duplicate |
+| **Photos pending** | Received without photos (fallback) | "Your request is received. Please send photos by replying to your confirmation email or by calling us." |
+
+No state shows a reference unless the write was confirmed.
+
+#### E. Free-tier limitations and mitigation
+
+| Limit | Effect on this design | Mitigation | Status |
+|---|---|---|---|
+| Supabase Free pauses after 1 week without use (verify) | Intake fails while paused; fallback queues | Probe, owner alert, weekly login, Pro option | Open (owner decision D3) |
+| No automated Supabase backups on Free | Data loss possible | §19.2 backups | Open until first verified restore |
+| Supabase Free storage 1 GB and egress limit (verify) | Limits photos and backup copies | Resizing, storage meter, capped copy | Open |
+| Resend Free: 3,000 per month, 100 per day (verify) | Owner alerts and customer emails can be blocked on busy days | Alerts are not the only record (D1 queue); monthly counter; Pro option | Open |
+| Cloudflare Workers, D1, KV free allowances (verify) | Fallback could fail under heavy use | Monitor usage; queue purged only after confirmation | Open |
+| Cloudflare Pages: one concurrent build, 500 builds per month (verify) | Publishing can queue | Batch edits; status in admin | Accepted |
+| Cloudflare Access free user limit, 50 users (verify) | Staff access limited | Owner-only launch | Accepted |
+| GitHub Actions minutes and scheduled workflow disabling | Backups can stop | §19.2 F detection and manual procedure | Open |
+
+#### F. Production readiness gates
+
+The system is **not production-ready** until every gate is closed and recorded in the owner's approval:
+
+1. Owner decides the intake fallback (D2) and the Supabase plan or written acceptance of the pause and backup risk (D3, D4).
+2. A backup has been created, restored in the drill, and checked against the manifest.
+3. The fallback path has been tested end to end: primary failure, queued write, owner alert, drain, and confirmation.
+4. Customer states in §19.3 D have been tested on iPhone (Safari) and reviewed in both languages.
+5. Email sending domain is verified (SPF, DKIM, DMARC) and a test email arrives.
+6. Free-tier limits in §13 are re-verified on each vendor's pricing page.
+7. Owner has reviewed and approved all content (no placeholders remain on public pages).
+8. Legal pages reviewed by the owner or counsel.
+9. Owner tested the site on their own iPhone.
+
+### 19.4 Welcome Center (three access levels, placeholders, and link control)
+
+#### A. Access levels (kept from Revision 2)
+
+| Level | Name | Who can see it | How it is reached |
+|---|---|---|---|
+| 1 | Public | Anyone | Welcome Center index, navigation |
+| 2 | After request | Anyone with the thanks page or the acknowledgment email | Unlisted general pages (`noindex`, not in the index or sitemap). They contain no customer-specific data |
+| 3 | After approval (packet) | Only the customer whose estimate is approved, through a link the owner sends | Tokenized link (below) |
+
+#### B. Placeholders (no document exists until the owner supplies and approves it)
+
+| Resource | Level | Placeholder until supplied |
+|---|---|---|
+| Welcome presentation | 1 | `[OWNER TO PROVIDE: welcome presentation, EN and ES]` |
+| FAQs | 1 | `[OWNER TO PROVIDE: question and answer pairs, EN and ES]` |
+| Service information sheets (one per service) | 1 | `[OWNER TO PROVIDE: service sheet, <service>, EN and ES]` |
+| Cleaning standards document | 1 | `[OWNER TO PROVIDE: standards document, EN and ES]` |
+| "What to expect" page | 2 | `[OWNER TO PROVIDE: estimate process text, EN and ES]` |
+| Welcome packet guide (PDF) | 3 | `[OWNER TO PROVIDE: welcome packet PDF, EN and ES]` |
+| Service agreement template | 3 | `[OWNER TO PROVIDE: service agreement, EN and ES; legal review recommended]` |
+| Site access and key procedure template | 3 | `[OWNER TO PROVIDE: access procedure template, EN and ES]` |
+| Emergency and after-hours contacts | 3 | `[OWNER TO PROVIDE]` |
+
+A document or page appears only after the owner approves that exact file (or text) and that language version. Approving English does not approve Spanish.
+
+#### C. Packet link lifecycle
+
+1. **Creation.** The owner opens an estimate marked Approved and selects "Create packet link." The system generates a 256-bit random token with a cryptographically secure generator, shows it once, and stores only its SHA-256 hash with the submission ID, scope, creator, creation time, and expiry.
+2. **Expiry.** Default 60 days. The owner chooses 7 to 180 days. Expiry is checked on the server at each request, not in the browser.
+3. **Delivery.** By the owner's approved email template in the customer's language, or copied by the owner for phone or text. The token never appears in logs, analytics, or notifications.
+4. **Transport.** The link uses a URL fragment: `/en/welcome/packet#t=<token>`. Browsers do not send fragments to servers, so the token stays out of server access logs and the Referer header. A small script reads the fragment and sends the token to the packet function in a request header.
+5. **Validation.** The function hashes the token, finds the link, checks expiry, revocation, and that the submission is not archived. It returns only the approved packet content in the requested language, with `Cache-Control: no-store`. Each view records the link ID, time, and a view counter, with no personal data.
+6. **Failure limits.** Failed attempts are limited per IP address and per link ID, with a temporary lockout after repeated failures.
+7. **Revocation.** The owner can revoke one link, revoke all links for a submission, or revoke by rotation (creating a new link revokes the old one by default; the owner can keep both). Links are revoked automatically when a submission is archived, rejected, or deleted. Deletion removes tokens and packet items.
+8. **Loss or forwarding.** A lost link is replaced by a new one, and the old one is revoked. A forwarded link gives access to the packet, so the packet must contain only owner-approved, non-sensitive content. The policy prohibits payment or banking details in the packet; the system cannot enforce that content rule, so the owner confirms it when approving the packet.
+9. **Backups.** Token hashes are backed up. Tokens themselves are not stored, so a backup cannot reveal a usable link.
+
+#### D. Page controls
+
+- Packet and "after request" pages are `noindex`, excluded from the sitemap, use no third-party scripts, and send `Referrer-Policy: no-referrer`.
+- Level 2 pages can be unlisted or revoked by the owner at any time.
+
+### 19.5 Pricing security: confirmation
+
+**Confirmed:** under this design, all pricing rules, discounts, credits, and internal calculations remain private and server-side.
+
+| Exposure channel | Control | Verification |
+|---|---|---|
+| Customer-facing JavaScript (public site, form) | No pricing code, rates, or rule names in public bundles | Build scan for rate and rule identifiers; fail on match |
+| Public API (Supabase REST, GraphQL, Edge Functions) | `private` schema not exposed; GraphQL does not expose it; no public function returns pricing; owner functions check role and MFA level | pgTAP role tests; API probe as anonymous and editor |
+| Public PDFs | None generated publicly. The owner's customer PDF shows only line items the owner selects. Rule names, rates, multipliers, and credit logic never appear | Render tests with a canary value; the canary must not appear |
+| Emails | No pricing variable in any template allow-list; send-time check | Template tests |
+| Logs and errors | Pricing values are never logged; the audit log records action and object ID only; generic public error messages | Log-search test in CI |
+| Source files and repo | No rate values in source, seed, fixtures, or docs. Tests generate values at run time | Secret and pattern scan in CI |
+| Browser cache and service worker | Admin pricing responses are `no-store`; service worker excludes admin | Header test |
+| Backups | Pricing is in encrypted backups only | Key custody (§19.2 E) |
+| Owner's admin browser | Pricing visible after MFA step-up | Accepted residual risk (§7.8) |
+| Discounts and credits in the form | No field exists for them | Form schema check (no price keys) |
+
+Owner decisions on discount lines: the owner chooses whether a discount appears as a line on the customer PDF. The rule that produced it never appears.
+
+### 19.6 Bilingual content across the customer journey
+
+| Surface | English | Spanish | Rule |
+|---|---|---|---|
+| Public pages, navigation, footer, legal | Owner-approved | Owner-approved | Publish requires both (or explicit owner-approved fallback per item) |
+| Interface text (buttons, errors, form helpers, states) | Proposed for review | Proposed for review, marked "draft" until a reviewer approves | No UI string publishes without approval in both languages |
+| Estimate form (questions, options, help) | Owner-approved | Owner-approved | Form cannot publish with a missing locale |
+| Confirmation and "not received" messages | Approved | Approved | Same rules as interface text |
+| Acknowledgment and follow-up emails | Approved template | Approved template | Sent in the customer's locale |
+| Owner alert emails | Owner's language setting | — | Owner preference (D-admin-language) |
+| Estimate PDF from the owner | Owner chooses per estimate | Owner chooses per estimate | Default follows the customer's locale |
+| Documents | Separate EN file | Separate ES file | A language without an approved file is not shown; no silent fallback to the other language |
+| Welcome packet | Approved content in customer's locale | Approved content | Packet shows only the approved language; if the approved language is not the customer's, the owner is warned before sending |
+| Admin content editors | Both columns | Both columns | "Copy from English" creates an unapproved Spanish draft; it cannot be published |
+| Admin interface | Language to be chosen by owner | Language to be chosen by owner | §20.1 D1 |
+
+**Translation rules:**
+- **No automatic translation.** The system does not call translation services, does not auto-fill translations, and does not publish translations.
+- **Review record.** A named reviewer approves each Spanish item. The record stores reviewer, date, and item ID in the audit log.
+- **Unapproved drafts are visible only in the admin.** They cannot be previewed as public content unless the owner opens a preview that is clearly marked "draft."
+- **Reviewer required for legal, pricing, and contract wording.**
+
+### 19.7 Implementation boundaries and the existing application
+
+#### A. Boundaries (apply now and until the owner approves implementation)
+
+- No application code.
+- No deployment.
+- No paid service, plan, or subscription.
+- No connection to Google Drive, Supabase, Cloudflare, Resend, GitHub Actions secrets, or any other integration. No credentials created.
+- No modification of the existing public application.
+- No pushes and no publishing without owner approval. Commits remain local on branch `claude/bridiant-website-architecture-oophae` (`9a02731`, `2e4f3da`, plus the Revision 3 commit when made). The earlier stop-hook request to push is not being followed because of this instruction.
+- Repository access: the earlier push attempts returned HTTP 403 (the Claude GitHub App has no access to the repo). That remains unresolved.
+
+#### B. Security risk notice: existing public estimate application
+
+- **File:** `index.html.html` (single-file estimate app, about 2,870 lines).
+- **Risk:** its browser code contains the pricing logic (`computeSmartPrice`, `estimateTotalFromState`) and rate values. Anyone who opens the page source can read them.
+- **Status:** the repo does not show whether this file is currently deployed publicly. **Owner must confirm.**
+- **Owner action recommended now:** remove it from public hosting, or restrict it behind access control, until it is retired (§14.4). This document does not modify the file.
+- **Until addressed:** the file must not be used as a public estimate tool, and no customer should be sent to it.
+
+### 19.8 Revision 3 summary of commitments
+
+- No invented content. Placeholders everywhere; publish blocked until the owner approves each item.
+- Backups use free services, are encrypted, and are restore-tested. Limits and failure modes are stated.
+- Intake never reports success without a durable write, and the customer always knows what happened.
+- Welcome Center keeps three access levels, with placeholders and expiring, revocable, fragment-based packet links.
+- Pricing stays private and server-side, with verification for each exposure channel.
+- Spanish and English throughout, with no automatic or unapproved translation.
+- Implementation, deployment, paid services, integrations, pushes, and publishing all wait for explicit approval.
+
+---
+
+## 20. Owner approval checklist
+
+Nothing below is approved. Tick a box only after deciding. Each source item must be supplied and approved individually before it is used.
+
+### 20.1 Decisions
+
+| ID | Decision | Options | Recommendation | Owner answer |
+|---|---|---|---|---|
+| D1 | Admin interface language | English, Spanish, or both | English, with Spanish customer content | [ ] |
+| D2 | Intake fallback store | Cloudflare D1 queue, or email-only | D1 queue | [ ] |
+| D3 | Supabase plan | Free now with risk accepted, or Pro before go-live (about $25/month, verify) | Pro before go-live | [ ] |
+| D4 | Written acceptance of free-tier pause and backup risk, if D3 stays free | Accept or decline | Decline unless the owner accepts in writing | [ ] |
+| D5 | Backup schedule and retention | Daily; keep 30 daily and 12 monthly | As proposed | [ ] |
+| D6 | Backup destination | Owner's Google Drive (15 GB free, shared with Google services) | As proposed | [ ] |
+| D7 | Packet link expiry | Default 60 days; range 7–180 | As proposed | [ ] |
+| D8 | Packet link delivery | Email template, copied by owner, or both | Both | [ ] |
+| D9 | Welcome Center levels | Three levels as in §19.4 A | As proposed | [ ] |
+| D10 | Estimate photo limit | Default 6, 10 MB each | As proposed | [ ] |
+| D11 | Submission retention | Archive after 12 months; delete spam after 30 days | As proposed | [ ] |
+| D12 | Turnaround unit | Business days or hours | Owner chooses | [ ] |
+| D13 | Domain | Existing domain, or owner purchase of a new one | Owner chooses | [ ] |
+| D14 | Admin subdomain | e.g. `admin.<domain>` | As proposed | [ ] |
+| D15 | Staff admin users and roles | Owner only, or owner plus editors or reviewers | Owner only at launch | [ ] |
+| D16 | Photo ownership and permission confirmation | Who confirms and how | Owner confirms each photo | [ ] |
+| D17 | Legal review of privacy notice, terms, service agreement | Owner review, or counsel | Counsel recommended | [ ] |
+| D18 | Spanish reviewer | Name and role | Fluent reviewer for legal, pricing, and contract text | [ ] |
+| D19 | English fallback for any item | Allowed per item, or never | Never by default | [ ] |
+| D20 | Legacy estimate migration | Yes, no, or later | Later, after review | [ ] |
+| D21 | Public estimate app | Confirm whether `index.html.html` is deployed; remove from public hosting | Remove now | [ ] |
+| D22 | Owner alert language | English or Spanish | Owner chooses | [ ] |
+| D23 | Free stack approval (§13) | Approve, or amend | Approve after limits are re-verified | [ ] |
+| D24 | Error monitoring (Sentry free plan) | Include, or not at launch | Not at launch | [ ] |
+| D25 | Production-readiness gates (§19.3 F) | Accept as conditions for go-live | Accept | [ ] |
+| D26 | Repository access | Restore GitHub App access, or confirm the repo should be handled another way | Owner action required | [ ] |
+
+### 20.2 Source materials and business documents required (all currently missing)
+
+No item below exists in the system yet. Each must be supplied, then approved individually.
+
+| # | Item | Purpose | Format | Language | Status |
+|---|---|---|---|---|---|
+| S1 | Legal company name, trade name, logo | Brand and legal footer | SVG or PNG with transparent background | — | Missing |
+| S2 | Company photos: exteriors, interiors before and after, equipment, finished spaces, team at work (with permission for any people shown) | Our Work, Services, About | JPEG, PNG, WebP, or HEIC; original files | Captions in EN and ES | Missing |
+| S3 | Phone, email, address, hours | Contact and footer | Text | EN and ES where needed | Missing |
+| S4 | Service area (ZIP list or radius) and out-of-area message | Form validation | Text or list | EN and ES | Missing |
+| S5 | Years in business, license and insurance statements (only if true) | About and trust | Text plus license document if shown | EN and ES | Missing |
+| S6 | Service descriptions per service: summary, description, included tasks, excluded tasks, frequencies | Services | Text | EN and ES | Missing |
+| S7 | Cleaning standards: checklists and any standards document | Cleaning Standards | Text and PDF | EN and ES | Missing |
+| S8 | Estimate form questions, options, required flags, help text, photo limit | Request an Estimate | Text list | EN and ES | Missing |
+| S9 | Consent text and thank-you text | Form | Text | EN and ES | Missing |
+| S10 | Turnaround setting: number, unit, weekend and holiday note | Confirmation, emails | Text | EN and ES | Missing |
+| S11 | All pricing rules: base rates, size bands, frequency multipliers, add-ons, minimums, travel fee, tax | Private pricing engine | Owner-entered in admin, approved as a rate version | Internal (no translation) | Missing |
+| S12 | Discount and credit rules, with conditions | Private pricing engine | Owner-entered in admin | Internal | Missing |
+| S13 | FAQs: question and answer pairs | Welcome Center | Text | EN and ES | Missing |
+| S14 | "What to expect" estimate process text | Welcome Center, Level 2 | Text | EN and ES | Missing |
+| S15 | Welcome presentation (slides or pages) | Welcome Center | PDF, slides, or text plus images | EN and ES | Missing |
+| S16 | Welcome packet guide | Level 3 packet | PDF | EN and ES | Missing |
+| S17 | Service agreement template | Level 3 packet | PDF or text | EN and ES | Missing |
+| S18 | Site access and key procedure template | Level 3 packet | Text or PDF | EN and ES | Missing |
+| S19 | Emergency and after-hours contacts | Level 3 packet | Text | EN and ES | Missing |
+| S20 | Privacy notice and terms | Legal pages, form consent | Text | EN and ES | Missing |
+| S21 | Email template text: acknowledgment, follow-up, packet-ready, owner alert | Email | Text | EN and ES | Missing |
+| S22 | Testimonials, only with written permission | Home or About | Quote and permission record | EN and ES | Missing (optional) |
+| S23 | Existing estimate data to migrate (optional), and a list of which estimates to include | Legacy migration | Export from current app | — | Missing (optional) |
+| S24 | Spanish reviewer's name and approval of review scope | Translation approval | Owner statement | — | Missing |
+| S25 | Owner's preferred contact channel for alerts | Notifications | Text | — | Missing |
+| S26 | Confirmation of current public exposure of `index.html.html` | Security | Owner statement | — | Missing |
+
+### 20.3 Accounts and credentials the owner will create later (none created now)
+
+| Account or credential | Created by | When | Notes |
+|---|---|---|---|
+| Google account (2-Step Verification) and Drive folder | Owner | After approval of backups (D6) | Never share the password or recovery codes in chat |
+| `age` key pair | Owner, on own computer | Before first backup | Private key never leaves owner's control |
+| Supabase project and `backup_reader` role | Owner | After approval of D3 | Plan choice first |
+| Cloudflare account, Pages projects, Workers, D1, Access, Turnstile | Owner | After approval of §13 | Verify limits before activation |
+| Resend account, sending domain, DNS records | Owner | After approval and domain (D13) | DNS changes made by owner |
+| GitHub secrets (`SUPABASE_BACKUP_URL`, `RCLONE_CONFIG_BRIDIANT`) | Owner | After backup setup | Write-only in GitHub |
+| GitHub App access for the repo (D26) | Owner or org admin | Now, if pushes are wanted | Required before any push |
+
+### 20.4 Paid items (none activated; approval needed for each)
+
+| Item | Approx. cost (verify) | See |
+|---|---|---|
+| Supabase Pro | About $25 per month | §17, D3 |
+| Resend Pro | About $20 per month (if daily cap is hit) | §17 |
+| Cloudflare Zero Trust paid seats | Only beyond the free user limit | §17 |
+| Domain | About $15 per year | §17, D13 |
+| Malware scanning for uploads | Varies; none chosen | §17 |
+
+### 20.5 Phase approval
+
+- [ ] I approve Phase 0 only (confirm decisions and supply source materials). Implementation remains blocked until I approve each later phase separately (§16).
+- [ ] I approve Phase 1 (public site, EN and ES, placeholders only) on: ____________ (date).
+- Phases 2 to 5 require their own approval after Phase 1 results are reviewed.
+
+Owner signature or written approval: ____________________  Date: ____________
+
+---
+
+## 21. Summary
 
 - One **brand system** (navy dominant, white and subtle gray, navy tints only) shared by a **bilingual public site** (EN and ES, visible switcher) and a **separate, MFA-protected admin**.
 - **Simple customer journey:** arrive, learn, request an estimate, get confirmation with immediately available resources; after approval, a tokenized welcome packet.
@@ -762,4 +1153,4 @@ Recommendation: start on the free plan as requested, accept the risks in §15 it
 - **Free-first stack** at $0 with documented limits: Supabase Free (pauses, no backups, 1 GB storage), Cloudflare free tiers, Resend Free (3,000 per month, 100 per day), GitHub Free, and Google Drive for encrypted backups (RPO about 24 hours).
 - **No paid service or plan has been activated.** Paid options are listed in §17 for your approval.
 
-**Awaiting your review and approval of this revised architecture before any implementation begins.**
+**Awaiting your explicit approval of Revision 3 (§19) and the checklist (§20) before any implementation begins. Nothing has been pushed or published.**
