@@ -1,0 +1,83 @@
+{
+  "_note": "Residential cleaning only. The four service names come from the owner's brief. Every description, task list, frequency, photo, and FAQ link is a placeholder until the owner supplies and approves it. Services stay hidden from the public site until approved.",
+  "schemaVersion": 1,
+  "sector": "residential",
+  "services": [
+    {
+      "slug": { "en": "standard-cleaning", "es": "limpieza-estandar" },
+      "name": {
+        "value": { "en": "Standard Cleaning", "es": "Limpieza estándar" },
+        "status": { "en": "pending_approval", "es": "draft" }
+      },
+      "summary": {
+        "value": {
+          "en": "[OWNER TO PROVIDE: Standard Cleaning summary (EN)]",
+          "es": "[OWNER TO PROVIDE: Standard Cleaning summary (ES)]"
+        },
+        "status": { "en": "draft", "es": "draft" }
+      },
+      "includedTasks": { "value": { "en": [], "es": [] }, "note": "[OWNER TO PROVIDE: included tasks, EN and ES]" },
+      "excludedTasks": { "value": { "en": [], "es": [] }, "note": "[OWNER TO PROVIDE: excluded tasks, EN and ES]" },
+      "frequencies": { "value": [], "note": "[OWNER TO PROVIDE: frequencies offered]" },
+      "photos": [],
+      "visible": false
+    },
+    {
+      "slug": { "en": "deep-cleaning", "es": "limpieza-profunda" },
+      "name": {
+        "value": { "en": "Deep Cleaning", "es": "Limpieza profunda" },
+        "status": { "en": "pending_approval", "es": "draft" }
+      },
+      "summary": {
+        "value": {
+          "en": "[OWNER TO PROVIDE: Deep Cleaning summary (EN)]",
+          "es": "[OWNER TO PROVIDE: Deep Cleaning summary (ES)]"
+        },
+        "status": { "en": "draft", "es": "draft" }
+      },
+      "includedTasks": { "value": { "en": [], "es": [] }, "note": "[OWNER TO PROVIDE: included tasks, EN and ES]" },
+      "excludedTasks": { "value": { "en": [], "es": [] }, "note": "[OWNER TO PROVIDE: excluded tasks, EN and ES]" },
+      "frequencies": { "value": [], "note": "[OWNER TO PROVIDE: frequencies offered]" },
+      "photos": [],
+      "visible": false
+    },
+    {
+      "slug": { "en": "move-in-cleaning", "es": "limpieza-de-mudanza-entrada" },
+      "name": {
+        "value": { "en": "Move-In Cleaning", "es": "Limpieza de entrada" },
+        "status": { "en": "pending_approval", "es": "draft" }
+      },
+      "summary": {
+        "value": {
+          "en": "[OWNER TO PROVIDE: Move-In Cleaning summary (EN)]",
+          "es": "[OWNER TO PROVIDE: Move-In Cleaning summary (ES)]"
+        },
+        "status": { "en": "draft", "es": "draft" }
+      },
+      "includedTasks": { "value": { "en": [], "es": [] }, "note": "[OWNER TO PROVIDE: included tasks, EN and ES]" },
+      "excludedTasks": { "value": { "en": [], "es": [] }, "note": "[OWNER TO PROVIDE: excluded tasks, EN and ES]" },
+      "frequencies": { "value": [], "note": "[OWNER TO PROVIDE: frequencies offered]" },
+      "photos": [],
+      "visible": false
+    },
+    {
+      "slug": { "en": "move-out-cleaning", "es": "limpieza-de-mudanza-salida" },
+      "name": {
+        "value": { "en": "Move-Out Cleaning", "es": "Limpieza de salida" },
+        "status": { "en": "pending_approval", "es": "draft" }
+      },
+      "summary": {
+        "value": {
+          "en": "[OWNER TO PROVIDE: Move-Out Cleaning summary (EN)]",
+          "es": "[OWNER TO PROVIDE: Move-Out Cleaning summary (ES)]"
+        },
+        "status": { "en": "draft", "es": "draft" }
+      },
+      "includedTasks": { "value": { "en": [], "es": [] }, "note": "[OWNER TO PROVIDE: included tasks, EN and ES]" },
+      "excludedTasks": { "value": { "en": [], "es": [] }, "note": "[OWNER TO PROVIDE: excluded tasks, EN and ES]" },
+      "frequencies": { "value": [], "note": "[OWNER TO PROVIDE: frequencies offered]" },
+      "photos": [],
+      "visible": false
+    }
+  ]
+}

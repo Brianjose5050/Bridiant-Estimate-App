@@ -33,6 +33,13 @@ Apps (`apps/public`, `apps/admin`) are not created yet. They start in Phase 1 an
 - **Pricing:** `content/seed/pricing-rules.json` is empty and marked private. It must never be copied into public output.
 - **Interface strings:** every entry is `proposed` until the owner approves it. Spanish entries are drafts until a named reviewer approves them.
 
+## Scope (owner decision, current)
+
+- **Residential cleaning only.** Commercial, office, medical, retail, and industrial service types are out of scope. The request form offers residential property types only (to be supplied by the owner, S7).
+- **Four services:** Standard Cleaning, Deep Cleaning, Move-In Cleaning, Move-Out Cleaning. Their English names come from the owner. Spanish names are proposals (draft) until a named reviewer approves them.
+- **Seed:** `content/seed/services.json` holds the four services with placeholder descriptions. All four stay hidden until approved.
+- **Source files:** owner-supplied PDFs, images, and business text are organized as listed in `content/source/MANIFEST.md`. Nothing has been received yet.
+
 ## Not part of Phase 0
 
 - The existing estimate app (`index.html.html`, `manifest.json`, `service-worker.js`, `icons/`, `vercel.json.txt.txt`, `README.md`) is untouched.
