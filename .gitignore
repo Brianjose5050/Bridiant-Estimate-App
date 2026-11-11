@@ -19,6 +19,12 @@ coverage/
 backups/
 restore-drill/
 
+# Owner source materials (photos, PDFs, logos) stay out of the repository.
+# The repo is public. Only the manifest and folder placeholders are tracked.
+content/source/**
+!content/source/MANIFEST.md
+!content/source/**/.gitkeep
+
 # Editor and OS files
 .DS_Store
 .idea/
