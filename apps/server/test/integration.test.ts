@@ -7,8 +7,8 @@ import { processOutbox, type EmailSender } from '../src/email.js';
 
 const packet = JSON.parse(readFileSync(join(import.meta.dirname, '../../../content/seed/welcome-packet.json'), 'utf8'));
 
-function count(h: Harness, sql: string): number {
-  return (h.db.prepare(sql).get() as { n: number }).n;
+async function count(h: Harness, sql: string): Promise<number> {
+  return ((await h.db.first(sql, [])) as { n: number }).n;
 }
 
 async function adminGet(h: Harness, path: string, cookie: string): Promise<Response> {
@@ -37,22 +37,22 @@ describe('1. Public estimate intake', () => {
     expect(status).toBe(200);
     expect(json.status).toBe('received');
     expect(String(json.reference)).toMatch(/^BFG-[0-9A-HJKMNP-TV-Z]{6}$/);
-    expect(count(h, 'SELECT COUNT(*) AS n FROM estimate_request')).toBe(1);
-    expect(count(h, 'SELECT COUNT(*) AS n FROM request_photo')).toBe(2);
-    expect(count(h, "SELECT COUNT(*) AS n FROM request_event WHERE kind = 'received'")).toBe(1);
+    expect(await count(h, 'SELECT COUNT(*) AS n FROM estimate_request')).toBe(1);
+    expect(await count(h, 'SELECT COUNT(*) AS n FROM request_photo')).toBe(2);
+    expect(await count(h, "SELECT COUNT(*) AS n FROM request_event WHERE kind = 'received'")).toBe(1);
   });
 
   it('writes photos to private storage with random names and records a checksum', async () => {
-    const rows = h.db.prepare('SELECT storage_name, sha256, bytes FROM request_photo').all() as Array<{ storage_name: string; sha256: string; bytes: number }>;
+    const rows = (await h.db.all('SELECT storage_name, sha256, bytes FROM request_photo', [])) as Array<{ storage_name: string; sha256: string; bytes: number }>;
     expect(rows).toHaveLength(2);
     for (const row of rows) {
-      expect(row.storage_name).toMatch(/^[A-Za-z0-9_-]+\.(jpg|png)$/);
-      expect(existsSync(join(h.cfg.privateDir, row.storage_name))).toBe(true);
+      expect(row.storage_name).toMatch(/^requests\/[A-Za-z0-9_-]+\.(jpg|png)$/);
+      expect(existsSync(join(h.privateDir, row.storage_name))).toBe(true);
       expect(row.sha256).toMatch(/^[0-9a-f]{64}$/);
       expect(row.bytes).toBeGreaterThan(0);
     }
     // Photos are never inside the public folder.
-    expect(h.cfg.privateDir.startsWith(h.cfg.publicDir)).toBe(false);
+    expect(h.privateDir.startsWith(h.publicDir)).toBe(false);
   });
 
   it('does not create a duplicate for a repeated idempotency key', async () => {
@@ -60,25 +60,25 @@ describe('1. Public estimate intake', () => {
     const first = await submit(h, payload);
     const second = await submit(h, payload);
     expect(second.json.reference).toBe(first.json.reference);
-    expect(count(h, 'SELECT COUNT(*) AS n FROM estimate_request')).toBe(2);
+    expect(await count(h, 'SELECT COUNT(*) AS n FROM estimate_request')).toBe(2);
   });
 
   it('rejects an invalid form and stores nothing', async () => {
-    const before = count(h, 'SELECT COUNT(*) AS n FROM estimate_request');
+    const before = await count(h, 'SELECT COUNT(*) AS n FROM estimate_request');
     const { status, json } = await submit(h, validPayload({ consent: false }));
     expect(status).toBe(400);
     expect(json.status).toBe('invalid');
-    expect(count(h, 'SELECT COUNT(*) AS n FROM estimate_request')).toBe(before);
+    expect(await count(h, 'SELECT COUNT(*) AS n FROM estimate_request')).toBe(before);
   });
 
   it('rejects a disguised file (an executable renamed to .jpg) and writes nothing', async () => {
-    const before = count(h, 'SELECT COUNT(*) AS n FROM estimate_request');
-    const filesBefore = readdirSync(h.cfg.privateDir).length;
+    const before = await count(h, 'SELECT COUNT(*) AS n FROM estimate_request');
+    const filesBefore = readdirSync(h.privateDir).length;
     const { status, json } = await submit(h, validPayload(), [{ name: 'photo.jpg', data: Buffer.from('MZ\x90\0 not a photo'), type: 'image/jpeg' }]);
     expect(status).toBe(400);
     expect(json.issues).toEqual([{ field: 'photos', code: 'unsupported_file' }]);
-    expect(count(h, 'SELECT COUNT(*) AS n FROM estimate_request')).toBe(before);
-    expect(readdirSync(h.cfg.privateDir).length).toBe(filesBefore);
+    expect(await count(h, 'SELECT COUNT(*) AS n FROM estimate_request')).toBe(before);
+    expect(readdirSync(h.privateDir).length).toBe(filesBefore);
   });
 
   it('rejects a PDF sent as a photo', async () => {
@@ -117,12 +117,12 @@ describe('2. Storage failure never produces a false confirmation', () => {
     try {
       // Make the private folder unusable: a file sits where the directory should be.
       const { writeFileSync } = await import('node:fs');
-      writeFileSync(h.cfg.privateDir, 'not a directory');
+      writeFileSync(h.privateDir, 'not a directory');
       const { status, json } = await submit(h, validPayload({ idempotencyKey: 'storage-fail-000001' }), [{ name: 'a.jpg', data: jpeg(), type: 'image/jpeg' }]);
       expect(status).toBe(503);
       expect(json).toEqual({ status: 'unavailable' });
-      expect(count(h, 'SELECT COUNT(*) AS n FROM estimate_request')).toBe(0);
-      expect(count(h, 'SELECT COUNT(*) AS n FROM email_outbox')).toBe(0);
+      expect(await count(h, 'SELECT COUNT(*) AS n FROM estimate_request')).toBe(0);
+      expect(await count(h, 'SELECT COUNT(*) AS n FROM email_outbox')).toBe(0);
     } finally {
       await h.close();
     }
@@ -185,7 +185,7 @@ describe('4. Owner panel access control', () => {
   it('signs in with password and authenticator code, with secure cookie attributes', async () => {
     const response = await fetch(`${h.base}/admin/login`, {
       method: 'POST',
-      body: new URLSearchParams({ username: USERNAME, password: PASSWORD, code: currentCode(h.totpSecret) }),
+      body: new URLSearchParams({ username: USERNAME, password: PASSWORD, code: (await currentCode(h.totpSecret)) }),
       redirect: 'manual',
     });
     expect(response.status).toBe(303);
@@ -200,7 +200,7 @@ describe('4. Owner panel access control', () => {
     const response = await fetch(`${h.base}/admin/login`, {
       method: 'POST',
       headers: { origin: 'https://evil.example' },
-      body: new URLSearchParams({ username: USERNAME, password: PASSWORD, code: currentCode(h.totpSecret) }),
+      body: new URLSearchParams({ username: USERNAME, password: PASSWORD, code: (await currentCode(h.totpSecret)) }),
       redirect: 'manual',
     });
     expect(response.status).toBe(403);
@@ -225,7 +225,7 @@ describe('4. Owner panel access control', () => {
       await submit(h2, validPayload({ idempotencyKey: 'idle-seed-00000001' }));
       const { cookie } = await signIn(h2);
       expect((await adminGet(h2, '/admin/requests', cookie)).status).toBe(200);
-      h2.db.prepare('UPDATE admin_session SET last_seen_at = ?').run(new Date(Date.now() - 31 * 60 * 1000).toISOString());
+      (await h2.db.run('UPDATE admin_session SET last_seen_at = ?', [new Date(Date.now() - 31 * 60 * 1000).toISOString()]));
       expect((await adminGet(h2, '/admin/requests', cookie)).status).toBe(303);
     } finally {
       await h2.close();
@@ -239,7 +239,7 @@ describe('4. Owner panel access control', () => {
     expect(noToken.status).toBe(403);
     const wrongToken = await adminPost(h, '/admin/requests/1/status', cookie, 'forged', { status: 'contacted' });
     expect(wrongToken.status).toBe(403);
-    const status = h.db.prepare('SELECT status FROM estimate_request WHERE id = 1').get() as { status: string };
+    const status = (await h.db.first('SELECT status FROM estimate_request WHERE id = 1', [])) as { status: string };
     expect(status.status).toBe('new');
   });
 
@@ -296,17 +296,17 @@ describe('5. Requests in the private panel', () => {
   });
 
   it('opens a request, shows contact and answers, and marks it as opened', async () => {
-    const id = (h.db.prepare("SELECT id FROM estimate_request WHERE name = 'Alice Example'").get() as { id: number }).id;
+    const id = ((await h.db.first("SELECT id FROM estimate_request WHERE name = 'Alice Example'", [])) as { id: number }).id;
     const html = await (await adminGet(h, `/admin/requests/${id}`, cookie)).text();
     expect(html).toContain('alice@example.test');
     expect(html).toContain('Standard Cleaning');
     expect(html).toContain('Private test note');
-    const reviewed = h.db.prepare('SELECT reviewed_at FROM estimate_request WHERE id = ?').get(id) as { reviewed_at: string | null };
+    const reviewed = (await h.db.first('SELECT reviewed_at FROM estimate_request WHERE id = ?', [id])) as { reviewed_at: string | null };
     expect(reviewed.reviewed_at).not.toBeNull();
   });
 
   it('shows photos only through an authenticated route', async () => {
-    const row = h.db.prepare('SELECT request_id, id, storage_name FROM request_photo').get() as { request_id: number; id: number; storage_name: string };
+    const row = (await h.db.first('SELECT request_id, id, storage_name FROM request_photo', [])) as { request_id: number; id: number; storage_name: string };
     const anon = await fetch(`${h.base}/admin/requests/${row.request_id}/photos/${row.id}`, { redirect: 'manual' });
     expect(anon.status).toBe(303);
     const ok = await adminGet(h, `/admin/requests/${row.request_id}/photos/${row.id}`, cookie);
@@ -318,18 +318,18 @@ describe('5. Requests in the private panel', () => {
   });
 
   it('does not serve a photo through a mismatched request id', async () => {
-    const row = h.db.prepare('SELECT id FROM request_photo LIMIT 1').get() as { id: number };
+    const row = (await h.db.first('SELECT id FROM request_photo LIMIT 1', [])) as { id: number };
     const response = await adminGet(h, `/admin/requests/9999/photos/${row.id}`, cookie);
     expect(response.status).toBe(404);
   });
 
   it('changes status with an audit event that records the old and new value', async () => {
-    const id = (h.db.prepare("SELECT id FROM estimate_request WHERE name = 'Alice Example'").get() as { id: number }).id;
+    const id = ((await h.db.first("SELECT id FROM estimate_request WHERE name = 'Alice Example'", [])) as { id: number }).id;
     const r = await adminPost(h, `/admin/requests/${id}/status`, cookie, csrf, { status: 'contacted' });
     expect(r.status).toBe(303);
-    const row = h.db.prepare('SELECT status FROM estimate_request WHERE id = ?').get(id) as { status: string };
+    const row = (await h.db.first('SELECT status FROM estimate_request WHERE id = ?', [id])) as { status: string };
     expect(row.status).toBe('contacted');
-    const event = h.db.prepare("SELECT from_value, to_value FROM request_event WHERE request_id = ? AND kind = 'status_changed'").get(id) as { from_value: string; to_value: string };
+    const event = (await h.db.first("SELECT from_value, to_value FROM request_event WHERE request_id = ? AND kind = 'status_changed'", [id])) as { from_value: string; to_value: string };
     expect(event).toEqual({ from_value: 'new', to_value: 'contacted' });
   });
 
@@ -340,7 +340,7 @@ describe('5. Requests in the private panel', () => {
   });
 
   it('adds a private note that appears in the panel and never in public responses', async () => {
-    const id = (h.db.prepare("SELECT id FROM estimate_request WHERE name = 'Alice Example'").get() as { id: number }).id;
+    const id = ((await h.db.first("SELECT id FROM estimate_request WHERE name = 'Alice Example'", [])) as { id: number }).id;
     const r = await adminPost(h, `/admin/requests/${id}/notes`, cookie, csrf, { body: 'INTERNAL: call after 5pm' });
     expect(r.status).toBe(303);
     const html = await (await adminGet(h, `/admin/requests/${id}`, cookie)).text();
@@ -352,12 +352,12 @@ describe('5. Requests in the private panel', () => {
   });
 
   it('keeps notes and history after a status change (nothing is overwritten)', async () => {
-    const id = (h.db.prepare("SELECT id FROM estimate_request WHERE name = 'Alice Example'").get() as { id: number }).id;
+    const id = ((await h.db.first("SELECT id FROM estimate_request WHERE name = 'Alice Example'", [])) as { id: number }).id;
     await adminPost(h, `/admin/requests/${id}/status`, cookie, csrf, { status: 'booked' });
     const html = await (await adminGet(h, `/admin/requests/${id}`, cookie)).text();
     expect(html).toContain('INTERNAL: call after 5pm');
     expect(html).toContain('Status changed');
-    const kinds = (h.db.prepare('SELECT kind FROM request_event WHERE request_id = ? ORDER BY id').all(id) as Array<{ kind: string }>).map((x) => x.kind);
+    const kinds = ((await h.db.all('SELECT kind FROM request_event WHERE request_id = ? ORDER BY id', [id])) as Array<{ kind: string }>).map((x) => x.kind);
     expect(kinds).toContain('received');
     expect(kinds.filter((k) => k === 'status_changed').length).toBeGreaterThanOrEqual(2);
   });
@@ -376,11 +376,11 @@ describe('6. Welcome Center: publishing rules', () => {
   let letterId = 0;
   beforeAll(async () => {
     h = await startHarness({});
-    seedWelcomePacket(h.db, packet);
+    await seedWelcomePacket(h.db, packet);
     const s = await signIn(h);
     cookie = s.cookie;
     csrf = s.csrf;
-    letterId = (h.db.prepare("SELECT id FROM welcome_resource WHERE chapter_key = 'letter'").get() as { id: number }).id;
+    letterId = ((await h.db.first("SELECT id FROM welcome_resource WHERE chapter_key = 'letter'", [])) as { id: number }).id;
   });
   afterAll(async () => {
     await h.close();
@@ -389,62 +389,62 @@ describe('6. Welcome Center: publishing rules', () => {
   const titles = async (lang: string) => ((await (await fetch(`${h.base}/api/welcome?lang=${lang}`)).json()) as { items: Array<{ key: string; title: string }> }).items.map((i) => i.key);
 
   it('seeds the five packet chapters unapproved and unpublished', async () => {
-    expect(count(h, 'SELECT COUNT(*) AS n FROM welcome_resource')).toBe(5);
-    expect(count(h, 'SELECT COUNT(*) AS n FROM welcome_resource WHERE published = 1 OR approved_en = 1 OR approved_es = 1')).toBe(0);
+    expect(await count(h, 'SELECT COUNT(*) AS n FROM welcome_resource')).toBe(5);
+    expect(await count(h, 'SELECT COUNT(*) AS n FROM welcome_resource WHERE published = 1 OR approved_en = 1 OR approved_es = 1')).toBe(0);
     expect(await titles('en')).toEqual([]);
   });
 
   it('seeding again adds nothing and changes nothing', async () => {
-    expect(seedWelcomePacket(h.db, packet)).toBe(0);
-    expect(count(h, 'SELECT COUNT(*) AS n FROM welcome_resource')).toBe(5);
+    expect(await seedWelcomePacket(h.db, packet)).toBe(0);
+    expect(await count(h, 'SELECT COUNT(*) AS n FROM welcome_resource')).toBe(5);
   });
 
   it('a draft that is not published never reaches the public list', async () => {
-    await adminPost(h, `/admin/welcome/${letterId}`, cookie, csrf, { ...fieldsFor(h, letterId), approvedEn: '1' });
+    await adminPost(h, `/admin/welcome/${letterId}`, cookie, csrf, { ...(await fieldsFor(h, letterId)), approvedEn: '1' });
     expect(await titles('en')).toEqual([]);
   });
 
   it('refuses to publish when no language is approved', async () => {
-    const r = await adminPost(h, `/admin/welcome/${letterId}`, cookie, csrf, { ...fieldsFor(h, letterId), published: '1' });
+    const r = await adminPost(h, `/admin/welcome/${letterId}`, cookie, csrf, { ...(await fieldsFor(h, letterId)), published: '1' });
     expect(r.status).toBe(303);
     expect(r.headers.get('location')).toContain('err=');
     expect(await titles('en')).toEqual([]);
   });
 
   it('publishes an approved English chapter, visible in English only', async () => {
-    const r = await adminPost(h, `/admin/welcome/${letterId}`, cookie, csrf, { ...fieldsFor(h, letterId), approvedEn: '1', published: '1' });
+    const r = await adminPost(h, `/admin/welcome/${letterId}`, cookie, csrf, { ...(await fieldsFor(h, letterId)), approvedEn: '1', published: '1' });
     expect(r.headers.get('location')).toContain('ok=saved');
     expect(await titles('en')).toEqual(['letter']);
     expect(await titles('es')).toEqual([]);
   });
 
   it('shows a Spanish version only after Spanish is approved', async () => {
-    await adminPost(h, `/admin/welcome/${letterId}`, cookie, csrf, { ...fieldsFor(h, letterId), approvedEn: '1', approvedEs: '1', published: '1' });
+    await adminPost(h, `/admin/welcome/${letterId}`, cookie, csrf, { ...(await fieldsFor(h, letterId)), approvedEn: '1', approvedEs: '1', published: '1' });
     expect(await titles('es')).toEqual(['letter']);
     const item = (await (await fetch(`${h.base}/api/welcome?lang=es`)).json()) as { items: Array<{ title: string; body: string }> };
     expect(item.items[0]?.title).toBe('Bienvenido a Bridiant');
   });
 
   it('editing approved text removes that language approval until it is approved again', async () => {
-    const fields = fieldsFor(h, letterId);
+    const fields = await fieldsFor(h, letterId);
     const edited = { ...fields, bodyEn: `${fields.bodyEn}\n\nA new sentence.`, approvedEn: '' };
     await adminPost(h, `/admin/welcome/${letterId}`, cookie, csrf, { ...edited, published: '1' });
-    const row = h.db.prepare('SELECT approved_en FROM welcome_resource WHERE id = ?').get(letterId) as { approved_en: number };
+    const row = (await h.db.first('SELECT approved_en FROM welcome_resource WHERE id = ?', [letterId])) as { approved_en: number };
     expect(row.approved_en).toBe(0);
     expect(await titles('en')).toEqual([]);
   });
 
   it('withdrawing a chapter removes it at once', async () => {
-    await adminPost(h, `/admin/welcome/${letterId}`, cookie, csrf, { ...fieldsFor(h, letterId), approvedEn: '1', approvedEs: '1', published: '0' });
+    await adminPost(h, `/admin/welcome/${letterId}`, cookie, csrf, { ...(await fieldsFor(h, letterId)), approvedEn: '1', approvedEs: '1', published: '0' });
     expect(await titles('en')).toEqual([]);
     expect(await titles('es')).toEqual([]);
   });
 
   it('never returns the access tiers that are not yet connected', async () => {
-    const privateId = (h.db.prepare("SELECT id FROM welcome_resource WHERE chapter_key = 'contact'").get() as { id: number }).id;
-    h.db.prepare("UPDATE welcome_resource SET access_tier = 'after_approval', published = 1, approved_en = 1, approved_es = 1 WHERE id = ?").run(privateId);
+    const privateId = ((await h.db.first("SELECT id FROM welcome_resource WHERE chapter_key = 'contact'", [])) as { id: number }).id;
+    (await h.db.run("UPDATE welcome_resource SET access_tier = 'after_approval', published = 1, approved_en = 1, approved_es = 1 WHERE id = ?", [privateId]));
     expect(await titles('en')).not.toContain('contact');
-    h.db.prepare("UPDATE welcome_resource SET access_tier = 'public', published = 0 WHERE id = ?").run(privateId);
+    (await h.db.run("UPDATE welcome_resource SET access_tier = 'public', published = 0 WHERE id = ?", [privateId]));
   });
 
   it('creates a new resource from the panel, unpublished by default', async () => {
@@ -452,7 +452,7 @@ describe('6. Welcome Center: publishing rules', () => {
       kind: 'faq', accessTier: 'public', titleEn: 'Questions', titleEs: 'Preguntas', subtitleEn: '', subtitleEs: '', bodyEn: 'Q | A', bodyEs: '', sortOrder: '9',
     });
     expect(r.status).toBe(303);
-    expect(count(h, 'SELECT COUNT(*) AS n FROM welcome_resource WHERE published = 1')).toBe(0);
+    expect(await count(h, 'SELECT COUNT(*) AS n FROM welcome_resource WHERE published = 1')).toBe(0);
   });
 
   it('shows the Welcome Center form in the panel', async () => {
@@ -462,8 +462,8 @@ describe('6. Welcome Center: publishing rules', () => {
   });
 });
 
-function fieldsFor(h: Harness, id: number): Record<string, string> {
-  const r = h.db.prepare('SELECT * FROM welcome_resource WHERE id = ?').get(id) as Record<string, string | number>;
+async function fieldsFor(h: Harness, id: number): Promise<Record<string, string>> {
+  const r = (await h.db.first('SELECT * FROM welcome_resource WHERE id = ?', [id])) as Record<string, string | number>;
   return {
     kind: String(r.kind),
     accessTier: String(r.access_tier),
@@ -484,11 +484,11 @@ describe('7. Welcome Center documents', () => {
   let id = 0;
   beforeAll(async () => {
     h = await startHarness({});
-    seedWelcomePacket(h.db, packet);
+    await seedWelcomePacket(h.db, packet);
     const s = await signIn(h);
     cookie = s.cookie;
     csrf = s.csrf;
-    id = (h.db.prepare("SELECT id FROM welcome_resource WHERE chapter_key = 'prepare'").get() as { id: number }).id;
+    id = ((await h.db.first("SELECT id FROM welcome_resource WHERE chapter_key = 'prepare'", [])) as { id: number }).id;
   });
   afterAll(async () => {
     await h.close();
@@ -505,20 +505,20 @@ describe('7. Welcome Center documents', () => {
     const r = await upload(Buffer.from('MZ\x90\0 executable'), 'guide.pdf', 'application/pdf');
     expect(r.status).toBe(303);
     expect(r.headers.get('location')).toContain('err=');
-    expect(count(h, `SELECT COUNT(*) AS n FROM welcome_resource WHERE id = ${id} AND document_storage IS NOT NULL`)).toBe(0);
+    expect(await count(h, `SELECT COUNT(*) AS n FROM welcome_resource WHERE id = ${id} AND document_storage IS NOT NULL`)).toBe(0);
   });
 
   it('stores a real PDF privately, and does not serve it until it is published and approved', async () => {
     const r = await upload(pdf(), 'guide.pdf', 'application/pdf');
     expect(r.headers.get('location')).toContain('ok=saved');
-    const stored = h.db.prepare('SELECT document_storage FROM welcome_resource WHERE id = ?').get(id) as { document_storage: string };
-    expect(existsSync(join(h.cfg.privateDir, stored.document_storage))).toBe(true);
+    const stored = (await h.db.first('SELECT document_storage FROM welcome_resource WHERE id = ?', [id])) as { document_storage: string };
+    expect(existsSync(join(h.privateDir, stored.document_storage))).toBe(true);
     expect((await fetch(`${h.base}/api/welcome/documents/${id}?lang=en`)).status).toBe(404);
     expect((await fetch(`${h.base}/${stored.document_storage}`)).status).toBe(404);
   });
 
   it('serves the PDF to the public only after publication and approval, inline and as PDF', async () => {
-    await adminPost(h, `/admin/welcome/${id}`, cookie, csrf, { ...fieldsFor(h, id), approvedEn: '1', published: '1' });
+    await adminPost(h, `/admin/welcome/${id}`, cookie, csrf, { ...(await fieldsFor(h, id)), approvedEn: '1', published: '1' });
     const response = await fetch(`${h.base}/api/welcome/documents/${id}?lang=en`);
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('application/pdf');
@@ -539,9 +539,9 @@ describe('8. Email queue: notifications, persistence, retries, no duplicates', (
     try {
       await submit(h, validPayload({ email: 'client@example.invalid', idempotencyKey: 'mail-once-00000001' }));
       await submit(h, validPayload({ email: 'client@example.invalid', idempotencyKey: 'mail-once-00000001' }));
-      expect(count(h, "SELECT COUNT(*) AS n FROM email_outbox WHERE kind = 'owner_alert'")).toBe(1);
-      expect(count(h, "SELECT COUNT(*) AS n FROM email_outbox WHERE kind = 'customer_ack'")).toBe(1);
-      const alert = h.db.prepare("SELECT subject, body_text FROM email_outbox WHERE kind = 'owner_alert'").get() as { subject: string; body_text: string };
+      expect(await count(h, "SELECT COUNT(*) AS n FROM email_outbox WHERE kind = 'owner_alert'")).toBe(1);
+      expect(await count(h, "SELECT COUNT(*) AS n FROM email_outbox WHERE kind = 'customer_ack'")).toBe(1);
+      const alert = (await h.db.first("SELECT subject, body_text FROM email_outbox WHERE kind = 'owner_alert'", [])) as { subject: string; body_text: string };
       expect(alert.body_text).toContain('Test Customer');
       expect(alert.body_text).not.toContain('5550101234');
       expect(alert.body_text).not.toContain('client@example.invalid');
@@ -558,8 +558,8 @@ describe('8. Email queue: notifications, persistence, retries, no duplicates', (
       const { senderFor } = await import('../src/email.js');
       const result = await processOutbox(h.db, senderFor(h.cfg));
       expect(result.sent).toBe(0);
-      expect(count(h, "SELECT COUNT(*) AS n FROM email_outbox WHERE status = 'queued'")).toBe(2);
-      expect(count(h, 'SELECT COUNT(*) AS n FROM estimate_request')).toBe(1);
+      expect(await count(h, "SELECT COUNT(*) AS n FROM email_outbox WHERE status = 'queued'")).toBe(2);
+      expect(await count(h, 'SELECT COUNT(*) AS n FROM estimate_request')).toBe(1);
     } finally {
       await h.close();
     }
@@ -569,8 +569,8 @@ describe('8. Email queue: notifications, persistence, retries, no duplicates', (
     const h = await startHarness({});
     try {
       await submit(h, validPayload({ idempotencyKey: 'mail-skip-00000001' }));
-      expect(count(h, "SELECT COUNT(*) AS n FROM email_outbox WHERE status = 'skipped_no_recipient'")).toBe(1);
-      expect(count(h, 'SELECT COUNT(*) AS n FROM estimate_request')).toBe(1);
+      expect(await count(h, "SELECT COUNT(*) AS n FROM email_outbox WHERE status = 'skipped_no_recipient'")).toBe(1);
+      expect(await count(h, 'SELECT COUNT(*) AS n FROM estimate_request')).toBe(1);
     } finally {
       await h.close();
     }
@@ -583,18 +583,18 @@ describe('8. Email queue: notifications, persistence, retries, no duplicates', (
       const failing: EmailSender = { send: async () => { throw new Error('provider_http_500'); } };
       await processOutbox(h.db, failing);
       await processOutbox(h.db, failing);
-      expect(count(h, "SELECT COUNT(*) AS n FROM email_outbox WHERE status = 'queued' AND attempts = 2")).toBe(1);
+      expect(await count(h, "SELECT COUNT(*) AS n FROM email_outbox WHERE status = 'queued' AND attempts = 2")).toBe(1);
       await processOutbox(h.db, failing);
-      expect(count(h, "SELECT COUNT(*) AS n FROM email_outbox WHERE status = 'failed'")).toBe(1);
+      expect(await count(h, "SELECT COUNT(*) AS n FROM email_outbox WHERE status = 'failed'")).toBe(1);
       const { retryFailedEmails } = await import('../src/email.js');
-      expect(retryFailedEmails(h.db)).toBe(1);
+      expect(await retryFailedEmails(h.db)).toBe(1);
       const sent: string[] = [];
       const ok: EmailSender = { send: async (m) => { sent.push(m.to); } };
       const result = await processOutbox(h.db, ok);
       expect(result.sent).toBe(1);
       expect(sent).toEqual(['owner@example.invalid']);
-      expect(count(h, "SELECT COUNT(*) AS n FROM email_outbox WHERE status = 'sent'")).toBe(1);
-      expect(count(h, 'SELECT COUNT(*) AS n FROM estimate_request')).toBe(1);
+      expect(await count(h, "SELECT COUNT(*) AS n FROM email_outbox WHERE status = 'sent'")).toBe(1);
+      expect(await count(h, 'SELECT COUNT(*) AS n FROM estimate_request')).toBe(1);
     } finally {
       await h.close();
     }
@@ -607,7 +607,7 @@ describe('9. Exposure: what the public can and cannot reach', () => {
   beforeAll(async () => {
     h = await startHarness({});
     await submit(h, validPayload({ idempotencyKey: 'expose-seed-0000001' }), [{ name: 'a.jpg', data: jpeg(), type: 'image/jpeg' }]);
-    photoStorage = (h.db.prepare('SELECT storage_name FROM request_photo').get() as { storage_name: string }).storage_name;
+    photoStorage = ((await h.db.first('SELECT storage_name FROM request_photo', [])) as { storage_name: string }).storage_name;
   });
   afterAll(async () => {
     await h.close();
@@ -625,6 +625,12 @@ describe('9. Exposure: what the public can and cannot reach', () => {
       const r = await fetch(`${h.base}${path}`);
       expect(r.status, path).toBe(404);
     }
+  });
+
+  it('serves the panel stylesheet as CSS, not HTML', async () => {
+    const css = await fetch(`${h.base}/admin/static/admin.css`);
+    expect(css.status).toBe(200);
+    expect(css.headers.get('content-type')).toBe('text/css; charset=utf-8');
   });
 
   it('sends strict security headers on panel and public pages', async () => {
@@ -647,9 +653,9 @@ describe('9. Exposure: what the public can and cannot reach', () => {
     }
   });
 
-  it('stores the password as a salted scrypt hash and the authenticator secret encrypted', async () => {
-    const row = h.db.prepare('SELECT password_hash, totp_secret_enc FROM admin_user').get() as { password_hash: string; totp_secret_enc: string };
-    expect(row.password_hash.startsWith('scrypt$')).toBe(true);
+  it('stores the password as a salted PBKDF2 hash and the authenticator secret encrypted', async () => {
+    const row = (await h.db.first('SELECT password_hash, totp_secret_enc FROM admin_user', [])) as { password_hash: string; totp_secret_enc: string };
+    expect(row.password_hash.startsWith('pbkdf2-sha256$100000$')).toBe(true);
     expect(row.password_hash).not.toContain(PASSWORD);
     expect(row.totp_secret_enc.startsWith('v1.')).toBe(true);
     expect(row.totp_secret_enc).not.toContain(h.totpSecret);

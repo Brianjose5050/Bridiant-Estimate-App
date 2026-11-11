@@ -1,16 +1,23 @@
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
-import { loadConfig } from '../config.js';
-import { openDb } from '../db.js';
+import { join } from 'node:path';
 import { createAdmin } from '../auth.js';
+import { loadConfig } from '../config.js';
+import { migrate } from '../db.js';
+import { sqliteDb } from '../node/sqlite-db.js';
+import { developmentKey } from '../main.js';
 
 /**
  * Creates the single owner account. Run once, on the owner's own computer.
  * The authenticator secret is shown once, so it can be added to an authenticator app.
+ * Local database only. Production accounts are created with the same logic against D1 (see docs/DESPLIEGUE.md).
  */
 async function main(): Promise<void> {
-  const cfg = loadConfig(process.env);
-  const db = openDb(cfg.dbPath);
+  const dataDir = process.env.BRIDIANT_DATA_DIR ?? join(process.cwd(), 'data');
+  const secretKey = process.env.BRIDIANT_SECRET_KEY ? undefined : await developmentKey(dataDir);
+  const cfg = loadConfig(process.env, secretKey ? { secretKey } : {});
+  const db = sqliteDb(join(dataDir, 'bridiant.sqlite'));
+  await migrate(db);
   const rl = createInterface({ input: stdin, output: stdout });
   try {
     const username = (process.env.BRIDIANT_ADMIN_USERNAME ?? (await rl.question('Owner username: '))).trim();

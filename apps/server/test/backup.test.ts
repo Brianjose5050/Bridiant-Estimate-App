@@ -4,20 +4,22 @@ import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync, statSy
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomBytes } from 'node:crypto';
-import { openDb } from '../src/db.js';
+import { migrate } from '../src/db.js';
+import { sqliteDb } from '../src/node/sqlite-db.js';
 import { jpeg } from './helpers.js';
 
 const script = resolve(import.meta.dirname, '../../../scripts/ops/backup-restore.mjs');
 const env = (key: string) => ({ ...process.env, BRIDIANT_BACKUP_KEY: key });
 
 describe('encrypted backup and verified restore (real files)', () => {
-  it('backs up a live database and private files, and restores them with every check passing', () => {
+  it('backs up a live database and private files, and restores them with every check passing', async () => {
     const root = mkdtempSync(join(tmpdir(), 'bk-'));
     const data = join(root, 'data');
     mkdirSync(join(data, 'private', 'gallery'), { recursive: true });
-    const db = openDb(join(data, 'bridiant.sqlite'));
-    db.prepare("INSERT INTO estimate_request (reference, idempotency_key, received_at, locale, status, services, services_text, home_type, bedrooms, bathrooms, name, ip_hash) VALUES ('BFG-AAAAAA', 'k-restore-000000001', ?, 'en', 'new', '[]', '', 'house', '2', '1', 'Restore Test', 'h')").run(new Date().toISOString());
-    db.prepare("INSERT INTO request_note (request_id, body, author, created_at) VALUES (1, 'private note', 'owner', ?)").run(new Date().toISOString());
+    const db = sqliteDb(join(data, 'bridiant.sqlite'));
+    await migrate(db);
+    await db.run("INSERT INTO estimate_request (reference, idempotency_key, received_at, locale, status, services, services_text, home_type, bedrooms, bathrooms, name, ip_hash) VALUES ('BFG-AAAAAA', 'k-restore-000000001', ?, 'en', 'new', '[]', '', 'house', '2', '1', 'Restore Test', 'h')", [new Date().toISOString()]);
+    await db.run("INSERT INTO request_note (request_id, body, author, created_at) VALUES (1, 'private note', 'owner', ?)", [new Date().toISOString()]);
     writeFileSync(join(data, 'private', 'gallery', 'photo.jpg.enc-source'), jpeg());
     db.close();
 
@@ -31,18 +33,20 @@ describe('encrypted backup and verified restore (real files)', () => {
 
     const out = execFileSync('node', [script, 'restore', backupDir, restoreDir], { env: env(key), encoding: 'utf8' });
     expect(out).toContain('all hashes and row counts match');
-    const restored = openDb(join(restoreDir, 'bridiant.sqlite'));
-    expect((restored.prepare('SELECT name FROM estimate_request').get() as { name: string }).name).toBe('Restore Test');
-    expect((restored.prepare('SELECT body FROM request_note').get() as { body: string }).body).toBe('private note');
+    const restored = sqliteDb(join(restoreDir, 'bridiant.sqlite'));
+    expect((await restored.first<{ name: string }>('SELECT name FROM estimate_request'))?.name).toBe('Restore Test');
+    expect((await restored.first<{ body: string }>('SELECT body FROM request_note'))?.body).toBe('private note');
     restored.close();
     expect(statSync(join(restoreDir, 'private', 'gallery', 'photo.jpg.enc-source')).size).toBe(jpeg().length);
   });
 
-  it('refuses to restore with the wrong key, and refuses a tampered backup', () => {
+  it('refuses to restore with the wrong key, and refuses a tampered backup', async () => {
     const root = mkdtempSync(join(tmpdir(), 'bk2-'));
     const data = join(root, 'data');
     mkdirSync(data, { recursive: true });
-    openDb(join(data, 'bridiant.sqlite')).close();
+    const empty = sqliteDb(join(data, 'bridiant.sqlite'));
+    await migrate(empty);
+    empty.close();
     const key = randomBytes(32).toString('base64');
     const backupDir = join(root, 'b');
     execFileSync('node', [script, 'backup', data, backupDir], { env: env(key) });

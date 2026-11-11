@@ -1,36 +1,16 @@
-import { join } from 'node:path';
-import type { Config } from '../config.js';
-import type { Db } from '../db.js';
-import { audit } from '../db.js';
-import { parseMultipart, UploadError } from '../estimates.js';
-import { createPair, deletePair, getPhoto, listPairs, listPhotos, listProjects, movePhoto, publishState, saveProject, softDeletePhoto, updatePhoto, uploadPhotos, PHOTO_KINDS, SERVICE_IDS, type PhotoKind } from '../gallery.js';
 import { esc, layout } from './view.js';
 import type { AdminLang } from './i18n.js';
+import type { AdminCtx } from './context.js';
+import { htmlResponse, redirect, requireCsrf, type AdminResponse } from './context.js';
+import { createPair, deletePair, getPhoto, listPairs, listPhotos, listProjects, movePhoto, PHOTO_KINDS, publishState, saveProject, SERVICE_IDS, softDeletePhoto, updatePhoto, uploadPhotos, type PhotoKind } from '../gallery.js';
+import { audit } from '../db.js';
+import { safeDisplayName } from '../security.js';
 
-/** Owner gallery screens. Every change requires the session CSRF token. Labels are working labels for the owner. */
-
-export interface GalleryCtx {
-  method: string;
-  path: string;
-  query: URLSearchParams;
-  body: Record<string, string>;
-  cfg: Config;
-  db: Db;
-  req: never;
-}
-
+/** Owner gallery screens. Every change requires the session CSRF token. */
 export interface GalleryBase {
   lang: AdminLang;
   csrf: string;
   path: string;
-  username: string;
-}
-
-export interface GalleryResult {
-  status: number;
-  html?: string;
-  headers?: Record<string, string>;
-  file?: { path: string; mime: string; name: string; inline: boolean };
 }
 
 const L = (lang: AdminLang, en: string, es: string) => (lang === 'es' ? es : en);
@@ -40,29 +20,6 @@ const KIND_LABEL: Record<PhotoKind, { en: string; es: string }> = {
   after: { en: 'After', es: 'Después' },
   regular: { en: 'Regular', es: 'Regular' },
 };
-
-function redirect(location: string): GalleryResult {
-  return { status: 303, headers: { Location: location } };
-}
-
-function page(base: GalleryBase, title: string, body: string, flash: string | null, error = false): GalleryResult {
-  const html = layout({
-    lang: base.lang,
-    title,
-    csrf: base.csrf,
-    signedIn: true,
-    activeNav: 'gallery',
-    path: base.path,
-    flash: flash ? { kind: error ? 'error' : 'ok', text: flash } : null,
-    body,
-  });
-  return { status: 200, html };
-}
-
-function selectOpts(options: Array<{ value: string; label: string }>, selected: string | null): string {
-  return options.map((o) => `<option value="${esc(o.value)}"${o.value === (selected ?? '') ? ' selected' : ''}>${esc(o.label)}</option>`).join('');
-}
-
 const SERVICE_NAMES: Record<string, { en: string; es: string }> = {
   'standard-cleaning': { en: 'Standard Cleaning', es: 'Limpieza estándar' },
   'deep-cleaning': { en: 'Deep Cleaning', es: 'Limpieza profunda' },
@@ -70,47 +27,53 @@ const SERVICE_NAMES: Record<string, { en: string; es: string }> = {
   'move-out-cleaning': { en: 'Move-Out Cleaning', es: 'Limpieza de salida' },
 };
 
+function selectOpts(options: Array<{ value: string; label: string }>, selected: string | null): string {
+  return options.map((o) => `<option value="${esc(o.value)}"${o.value === (selected ?? '') ? ' selected' : ''}>${esc(o.label)}</option>`).join('');
+}
+
 function serviceOptions(lang: AdminLang, selected: string | null): string {
   return selectOpts([{ value: '', label: L(lang, 'None', 'Ninguno') }, ...SERVICE_IDS.map((s) => ({ value: s, label: SERVICE_NAMES[s]?.[lang] ?? s }))], selected);
 }
 
-function projectOptions(db: Db, lang: AdminLang, selected: number | null): string {
-  const projects = listProjects(db);
+async function projectOptions(ctx: AdminCtx, lang: AdminLang, selected: number | null): Promise<string> {
+  const projects = await listProjects(ctx.db);
   return selectOpts(
     [{ value: '', label: L(lang, 'No project', 'Sin proyecto') }, ...projects.map((p) => ({ value: String(p.id), label: (lang === 'es' ? p.title_es : p.title_en) || `#${p.id}` }))],
     selected === null ? null : String(selected),
   );
 }
 
-export function handleGallery(ctx: GalleryCtx, base: GalleryBase): Promise<GalleryResult> | GalleryResult | null {
-  const { method, path, db, cfg } = ctx;
-  const { lang, csrf } = base;
-  const csrfOk = (token: string | undefined) => typeof token === 'string' && token === csrf;
-  const forbidden = () => ({ status: 403, html: layout({ lang, title: 'Forbidden', csrf, signedIn: true, path, body: `<p>${L(lang, 'This action could not be verified. Reload the page and try again.', 'No se pudo verificar la acción. Recargue la página e intente de nuevo.')}</p>` }) });
+function page(base: GalleryBase, title: string, body: string, flash: string | null, error = false): AdminResponse {
+  return htmlResponse(200, layout({ lang: base.lang, title, csrf: base.csrf, signedIn: true, activeNav: 'gallery', path: base.path, flash: flash ? { kind: error ? 'error' : 'ok', text: flash } : null, body }));
+}
 
-  // ----- Upload (multipart) -----
+export async function handleGallery(ctx: AdminCtx, base: GalleryBase): Promise<AdminResponse | null> {
+  const { method, path, db, input, query } = ctx;
+  const { lang, csrf } = base;
+  const forbidden = () => htmlResponse(403, layout({ lang, title: 'Forbidden', csrf, signedIn: true, path, body: `<p>${L(lang, 'This action could not be verified. Reload the page and try again.', 'No se pudo verificar la acción. Recargue la página e intente de nuevo.')}</p>` }));
+
+  // ----- Upload -----
   if (method === 'POST' && path === '/admin/gallery/upload') {
-    return (async (): Promise<GalleryResult> => {
-      const parsed = await parseMultipart(ctx.req as never, cfg).catch((e: unknown) => (e instanceof UploadError ? e : null));
-      if (!parsed || parsed instanceof UploadError) return redirect('/admin/gallery?err=' + encodeURIComponent('upload_failed'));
-      if (!csrfOk(parsed.fields.csrf)) return forbidden();
-      if (parsed.files.length === 0) return redirect('/admin/gallery?err=' + encodeURIComponent('no_files'));
-      try {
-        const added = await uploadPhotos(db, cfg, parsed.files);
-        return redirect(`/admin/gallery?ok=${added}`);
-      } catch (error) {
-        return redirect('/admin/gallery?err=' + encodeURIComponent(error instanceof Error ? error.message : 'upload_failed'));
-      }
-    })();
+    if (!requireCsrf(input, csrf)) return forbidden();
+    const parts = input.files.photos ?? [];
+    if (parts.length === 0) return redirect('/admin/gallery?err=' + encodeURIComponent('no_files'));
+    try {
+      const prepared = [];
+      for (const part of parts) prepared.push({ displayName: safeDisplayName(part.name), buffer: await part.data() });
+      const added = await uploadPhotos(db, ctx.files, prepared);
+      return redirect(`/admin/gallery?ok=${added}`);
+    } catch (error) {
+      return redirect('/admin/gallery?err=' + encodeURIComponent(error instanceof Error ? error.message : 'upload_failed'));
+    }
   }
 
   // ----- Projects -----
   if (method === 'POST' && path === '/admin/gallery/projects') {
-    if (!csrfOk(ctx.body.csrf)) return forbidden();
-    saveProject(db, null, {
-      titleEn: (ctx.body.titleEn ?? '').trim(),
-      titleEs: (ctx.body.titleEs ?? '').trim(),
-      serviceId: (SERVICE_IDS as readonly string[]).includes(ctx.body.serviceId ?? '') ? ctx.body.serviceId! : null,
+    if (!requireCsrf(input, csrf)) return forbidden();
+    await saveProject(db, null, {
+      titleEn: (input.fields.titleEn ?? '').trim(),
+      titleEs: (input.fields.titleEs ?? '').trim(),
+      serviceId: (SERVICE_IDS as readonly string[]).includes(input.fields.serviceId ?? '') ? input.fields.serviceId! : null,
       visible: false,
       approveEn: false,
       approveEs: false,
@@ -119,61 +82,61 @@ export function handleGallery(ctx: GalleryCtx, base: GalleryBase): Promise<Galle
   }
   const project = /^\/admin\/gallery\/projects\/(\d+)$/.exec(path);
   if (method === 'POST' && project) {
-    if (!csrfOk(ctx.body.csrf)) return forbidden();
-    saveProject(db, Number(project[1]), {
-      titleEn: (ctx.body.titleEn ?? '').trim(),
-      titleEs: (ctx.body.titleEs ?? '').trim(),
-      serviceId: (SERVICE_IDS as readonly string[]).includes(ctx.body.serviceId ?? '') ? ctx.body.serviceId! : null,
-      visible: ctx.body.visible === '1',
-      approveEn: ctx.body.approveEn === '1' && (ctx.body.titleEn ?? '').trim() !== '',
-      approveEs: ctx.body.approveEs === '1' && (ctx.body.titleEs ?? '').trim() !== '',
+    if (!requireCsrf(input, csrf)) return forbidden();
+    await saveProject(db, Number(project[1]), {
+      titleEn: (input.fields.titleEn ?? '').trim(),
+      titleEs: (input.fields.titleEs ?? '').trim(),
+      serviceId: (SERVICE_IDS as readonly string[]).includes(input.fields.serviceId ?? '') ? input.fields.serviceId! : null,
+      visible: input.fields.visible === '1',
+      approveEn: input.fields.approveEn === '1' && (input.fields.titleEn ?? '').trim() !== '',
+      approveEs: input.fields.approveEs === '1' && (input.fields.titleEs ?? '').trim() !== '',
     });
     return redirect('/admin/gallery?ok=saved');
   }
 
   // ----- Pairs -----
   if (method === 'POST' && path === '/admin/gallery/pairs') {
-    if (!csrfOk(ctx.body.csrf)) return forbidden();
-    const result = createPair(db, Number(ctx.body.before), Number(ctx.body.after));
+    if (!requireCsrf(input, csrf)) return forbidden();
+    const result = await createPair(db, Number(input.fields.before), Number(input.fields.after));
     return redirect(result.ok ? '/admin/gallery?ok=saved' : '/admin/gallery?err=' + encodeURIComponent(result.code));
   }
   const pairDelete = /^\/admin\/gallery\/pairs\/(\d+)\/delete$/.exec(path);
   if (method === 'POST' && pairDelete) {
-    if (!csrfOk(ctx.body.csrf)) return forbidden();
-    deletePair(db, Number(pairDelete[1]));
+    if (!requireCsrf(input, csrf)) return forbidden();
+    await deletePair(db, Number(pairDelete[1]));
     return redirect('/admin/gallery?ok=saved');
   }
 
   // ----- Photos -----
   const file = /^\/admin\/gallery\/photos\/(\d+)\/file$/.exec(path);
   if (method === 'GET' && file) {
-    const row = getPhoto(db, Number(file[1]));
+    const row = await getPhoto(db, Number(file[1]));
     if (!row) return { status: 404, html: 'Not found' };
-    audit(db, 'gallery_photo_viewed', 'gallery_photo', file[1] ?? null);
-    return { status: 200, file: { path: join(cfg.privateDir, 'gallery', row.storage_name), mime: row.mime, name: row.display_name, inline: true } };
+    await audit(db, 'gallery_photo_viewed', 'gallery_photo', file[1] ?? null);
+    return { status: 200, file: { key: row.storage_name, mime: row.mime, name: row.display_name, inline: true } };
   }
 
   const move = /^\/admin\/gallery\/photos\/(\d+)\/move$/.exec(path);
   if (method === 'POST' && move) {
-    if (!csrfOk(ctx.body.csrf)) return forbidden();
-    movePhoto(db, Number(move[1]), ctx.body.direction === 'up' ? -1 : 1);
+    if (!requireCsrf(input, csrf)) return forbidden();
+    await movePhoto(db, Number(move[1]), input.fields.direction === 'up' ? -1 : 1);
     return redirect('/admin/gallery?ok=saved');
   }
 
   const del = /^\/admin\/gallery\/photos\/(\d+)\/delete$/.exec(path);
   if (method === 'POST' && del) {
-    if (!csrfOk(ctx.body.csrf)) return forbidden();
-    softDeletePhoto(db, Number(del[1]));
+    if (!requireCsrf(input, csrf)) return forbidden();
+    await softDeletePhoto(db, Number(del[1]));
     return redirect('/admin/gallery?ok=saved');
   }
 
   const edit = /^\/admin\/gallery\/photos\/(\d+)$/.exec(path);
   if (method === 'POST' && edit) {
-    if (!csrfOk(ctx.body.csrf)) return forbidden();
+    if (!requireCsrf(input, csrf)) return forbidden();
     const id = Number(edit[1]);
-    const b = ctx.body;
+    const b = input.fields;
     const kind = (PHOTO_KINDS as readonly string[]).includes(b.kind ?? '') ? (b.kind as PhotoKind) : 'unclassified';
-    const result = updatePhoto(db, id, {
+    const result = await updatePhoto(db, id, {
       kind,
       projectId: b.projectId ? Number(b.projectId) : null,
       serviceId: (SERVICE_IDS as readonly string[]).includes(b.serviceId ?? '') ? b.serviceId! : null,
@@ -195,11 +158,10 @@ export function handleGallery(ctx: GalleryCtx, base: GalleryBase): Promise<Galle
   }
 
   if (method === 'GET' && edit) {
-    const row = getPhoto(db, Number(edit[1]));
+    const row = await getPhoto(db, Number(edit[1]));
     if (!row) return page(base, 'Not found', `<p>${L(lang, 'Not found.', 'No encontrado.')}</p>`, null);
-    const state = publishState(db);
+    const state = await publishState(db);
     const published = state.publishable.has(row.id);
-    const candidates = listPhotos(db).filter((p) => p.id !== row.id && p.project_id === row.project_id);
     const body = `
     <a class="back" href="/admin/gallery">← ${L(lang, 'Gallery', 'Galería')}</a>
     <section class="card hero-card">
@@ -210,7 +172,7 @@ export function handleGallery(ctx: GalleryCtx, base: GalleryBase): Promise<Galle
     <form method="post" action="/admin/gallery/photos/${row.id}" class="card stack">
       <input type="hidden" name="csrf" value="${esc(csrf)}">
       <label class="field"><span>${L(lang, 'Classification', 'Clasificación')}</span><select name="kind">${selectOpts(PHOTO_KINDS.map((k) => ({ value: k, label: KIND_LABEL[k][lang] })), row.kind)}</select></label>
-      <label class="field"><span>${L(lang, 'Project', 'Proyecto')}</span><select name="projectId">${projectOptions(db, lang, row.project_id)}</select></label>
+      <label class="field"><span>${L(lang, 'Project', 'Proyecto')}</span><select name="projectId">${await projectOptions(ctx, lang, row.project_id)}</select></label>
       <label class="field"><span>${L(lang, 'Service', 'Servicio')}</span><select name="serviceId">${serviceOptions(lang, row.service_id)}</select></label>
       <label class="check"><input type="checkbox" name="ownershipConfirmed" value="1"${row.ownership_confirmed ? ' checked' : ''}><span>${L(lang, 'I confirm the company took this photo or has permission to use it.', 'Confirmo que la empresa tomó esta foto o tiene permiso para usarla.')}</span></label>
       <label class="field"><span>${L(lang, 'People in the photo', 'Personas en la foto')}</span><select name="peopleStatus">${selectOpts([
@@ -222,7 +184,7 @@ export function handleGallery(ctx: GalleryCtx, base: GalleryBase): Promise<Galle
       <label class="field"><span>${L(lang, 'Caption (Spanish)', 'Leyenda (español)')}</span><input name="captionEs" value="${esc(row.caption_es)}" maxlength="240"></label>
       <label class="field"><span>${L(lang, 'Alt text (English)', 'Texto alternativo (inglés)')}</span><input name="altEn" value="${esc(row.alt_en)}" maxlength="240"></label>
       <label class="field"><span>${L(lang, 'Alt text (Spanish)', 'Texto alternativo (español)')}</span><input name="altEs" value="${esc(row.alt_es)}" maxlength="240"></label>
-      <p class="muted small">${L(lang, 'Changing a caption or alt text removes its approval. Approve again after review.', 'Si cambia una leyenda o un texto alternativo, pierde su aprobación. Apruébelo de nuevo tras revisarlo.')}</p>
+      <p class="muted small">${L(lang, 'Changing approved text removes its approval. Save first, then approve the new text.', 'Si cambia un texto aprobado, pierde su aprobación. Guarde primero y después apruebe el texto nuevo.')}</p>
       <label class="check"><input type="checkbox" name="approveCaptionEn" value="1"${row.approved_caption_en ? ' checked' : ''}><span>${L(lang, 'Caption approved (English)', 'Leyenda aprobada (inglés)')}</span></label>
       <label class="check"><input type="checkbox" name="approveCaptionEs" value="1"${row.approved_caption_es ? ' checked' : ''}><span>${L(lang, 'Caption approved (Spanish)', 'Leyenda aprobada (español)')}</span></label>
       <label class="check"><input type="checkbox" name="approveAltEn" value="1"${row.approved_alt_en ? ' checked' : ''}><span>${L(lang, 'Alt text approved (English)', 'Texto alternativo aprobado (inglés)')}</span></label>
@@ -235,25 +197,25 @@ export function handleGallery(ctx: GalleryCtx, base: GalleryBase): Promise<Galle
       <label class="check"><input type="checkbox" name="visible" value="1"${row.visible ? ' checked' : ''}><span>${L(lang, 'Visible on the site when published', 'Visible en el sitio cuando esté publicada')}</span></label>
       <button class="btn btn--primary" type="submit">${L(lang, 'Save', 'Guardar')}</button>
     </form>
-    ${row.kind === 'before' || row.kind === 'after' ? '' : ''}
     <form method="post" action="/admin/gallery/photos/${row.id}/delete" class="card">
       <input type="hidden" name="csrf" value="${esc(csrf)}">
       <p class="muted small">${L(lang, 'Removing a photo hides it everywhere and breaks any pair. The file is kept privately for the record.', 'Quitar una foto la oculta en todas partes y deshace cualquier par. El archivo se conserva en privado.')}</p>
       <button class="btn btn--ghost" type="submit">${L(lang, 'Remove photo', 'Quitar foto')}</button>
-    </form>
-    ${candidates.length > 0 ? `<p class="muted small">${L(lang, 'Pairs are created from the gallery list.', 'Los pares se crean desde la lista de la galería.')}</p>` : ''}`;
+    </form>`;
     return page(base, row.display_name, body, ctx.query.get('ok') ? L(lang, 'Saved.', 'Guardado.') : ctx.query.get('err') ? `${L(lang, 'Not saved:', 'No guardado:')} ${ctx.query.get('err')}` : null, !!ctx.query.get('err'));
   }
 
-  // ----- Gallery overview -----
+  // ----- Overview -----
   if (method === 'GET' && path === '/admin/gallery') {
-    const photos = listPhotos(db);
-    const pairs = listPairs(db);
-    const state = publishState(db);
+    const photos = await listPhotos(db);
+    const pairs = await listPairs(db);
+    const state = await publishState(db);
+    const projects = await listProjects(db);
     const pairedIds = new Set(pairs.flatMap((p) => [p.before_id, p.after_id]));
     const unpairedBefore = photos.filter((p) => p.kind === 'before' && !pairedIds.has(p.id));
     const unpairedAfter = photos.filter((p) => p.kind === 'after' && !pairedIds.has(p.id));
-    const flash = ctx.query.get('ok') ? (ctx.query.get('ok') === 'saved' ? L(lang, 'Saved.', 'Guardado.') : `${ctx.query.get('ok')} ${L(lang, 'photo(s) uploaded. They stay private until you approve them.', 'foto(s) subidas. Permanecen privadas hasta que las apruebe.')}`) : ctx.query.get('err') ? `${L(lang, 'Not saved:', 'No guardado:')} ${ctx.query.get('err')}` : null;
+    const okParam = query.get('ok');
+    const flash = okParam ? (okParam === 'saved' ? L(lang, 'Saved.', 'Guardado.') : `${okParam} ${L(lang, 'photo(s) uploaded. They stay private until you approve them.', 'foto(s) subidas. Permanecen privadas hasta que las apruebe.')}`) : query.get('err') ? `${L(lang, 'Not saved:', 'No guardado:')} ${query.get('err')}` : null;
     const body = `
     <section class="card stack">
       <h1>${L(lang, 'Gallery', 'Galería')}</h1>
@@ -263,13 +225,13 @@ export function handleGallery(ctx: GalleryCtx, base: GalleryBase): Promise<Galle
     <form method="post" action="/admin/gallery/upload" enctype="multipart/form-data" class="card stack">
       <input type="hidden" name="csrf" value="${esc(csrf)}">
       <label class="field"><span>${L(lang, 'Upload photos', 'Subir fotos')}</span><input type="file" name="photos" accept="image/jpeg,image/png,image/webp" multiple required></label>
-      <p class="muted small">${L(lang, 'JPEG, PNG, or WebP. Up to 15 MB each. Location data is removed automatically. No limit on the number of photos.', 'JPEG, PNG, WebP o HEIC. Hasta 15 MB cada una. Sin límite de número de fotos.')}</p>
+      <p class="muted small">${L(lang, 'JPEG, PNG, or WebP. Up to 15 MB each. Location data is removed automatically.', 'JPEG, PNG o WebP. Hasta 15 MB cada una. Los datos de ubicación se eliminan automáticamente.')}</p>
       <button class="btn btn--primary" type="submit">${L(lang, 'Upload', 'Subir')}</button>
     </form>
     <section class="card stack">
       <h2>${L(lang, 'Projects', 'Proyectos')}</h2>
-      <ul class="list">${listProjects(db).map((p) => `<li class="item"><a class="item__link" href="#project-${p.id}"><strong>${esc(p.title_en || '—')}</strong> · ${esc(p.title_es || '—')} <span class="item__meta">${p.visible && p.approved_en && p.approved_es ? L(lang, 'Visible', 'Visible') : L(lang, 'Hidden until approved', 'Oculto hasta aprobarse')}</span></a>
-        <form method="post" action="/admin/gallery/projects/${p.id}" class="stack" id="project-${p.id}" style="padding:0 18px 16px">
+      <ul class="list">${projects.map((p) => `<li class="item"><div class="item__link"><strong>${esc(p.title_en || '—')}</strong> · ${esc(p.title_es || '—')} <span class="item__meta">${p.visible && p.approved_en && p.approved_es ? L(lang, 'Visible', 'Visible') : L(lang, 'Hidden until approved', 'Oculto hasta aprobarse')}</span></div>
+        <form method="post" action="/admin/gallery/projects/${p.id}" class="stack" style="padding:0 18px 16px">
           <input type="hidden" name="csrf" value="${esc(csrf)}">
           <input name="titleEn" value="${esc(p.title_en)}" maxlength="120" placeholder="Title (EN)">
           <input name="titleEs" value="${esc(p.title_es)}" maxlength="120" placeholder="Título (ES)">
@@ -303,7 +265,7 @@ export function handleGallery(ctx: GalleryCtx, base: GalleryBase): Promise<Galle
       <h2>${L(lang, 'Photos', 'Fotos')}</h2>
       <ul class="list photo-grid">${photos.map((p) => {
         const live = state.publishable.has(p.id);
-        const status = live ? L(lang, 'Published', 'Publicada') : p.deleted_at ? L(lang, 'Removed', 'Quitada') : p.review_status === 'approved' ? L(lang, 'Approved, not published', 'Aprobada, no publicada') : L(lang, 'Private', 'Privada');
+        const status = live ? L(lang, 'Published', 'Publicada') : p.review_status === 'approved' ? L(lang, 'Approved, not published', 'Aprobada, no publicada') : L(lang, 'Private', 'Privada');
         return `<li class="card item">
           <a class="item__link" href="/admin/gallery/photos/${p.id}">
             <img src="/admin/gallery/photos/${p.id}/file" alt="" loading="lazy" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;background:#F1F3F5">
@@ -317,10 +279,9 @@ export function handleGallery(ctx: GalleryCtx, base: GalleryBase): Promise<Galle
         </li>`;
       }).join('') || `<li class="card muted">${L(lang, 'No photos uploaded yet.', 'Aún no se han subido fotos.')}</li>`}</ul>
     </section>`;
-    return page(base, L(lang, 'Gallery', 'Galería'), body, flash, !!ctx.query.get('err'));
+    return page(base, L(lang, 'Gallery', 'Galería'), body, flash, !!query.get('err'));
   }
 
   return null;
 }
 
-export { createPair, deletePair, PHOTO_KINDS };

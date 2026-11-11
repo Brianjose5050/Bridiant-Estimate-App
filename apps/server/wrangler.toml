@@ -14,3 +14,8 @@ migrations_dir = "migrations"
 [[r2_buckets]]
 binding = "PRIVATE_FILES"
 bucket_name = "bridiant-private-files"
+
+# Built public site (Astro output), served by the platform's assets binding. Built, not uploaded here.
+[assets]
+directory = "../public/dist"
+binding = "ASSETS"

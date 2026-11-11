@@ -1,56 +1,24 @@
-import { stat } from 'node:fs/promises';
-import { join } from 'node:path';
-import { REQUEST_STATUSES, nowIso, type Db, type RequestStatus } from '../db.js';
-import type { Config } from '../config.js';
-import { getSession, login, logout, SESSION_ABSOLUTE_MS } from '../auth.js';
 import { ACCESS_TIERS, WELCOME_KINDS, attachDocument, createResource, getResource, listResources, parseResourceInput, setApproval, setPublished, updateResource, type ResourceRow } from '../welcome.js';
 import { processOutbox, retryFailedEmails, senderFor } from '../email.js';
-import { parseMultipart, UploadError } from '../estimates.js';
-import { t, KIND_LABELS, TIER_LABELS, FREQUENCY_LABELS, type AdminLang } from './i18n.js';
+import { REQUEST_STATUSES, audit, auditStmt, nowIso, type RequestStatus } from '../db.js';
+import { getSession, login, logout, SESSION_ABSOLUTE_MS } from '../auth.js';
+import { FREQUENCY_LABELS, KIND_LABELS, TIER_LABELS, t, type AdminLang } from './i18n.js';
 import { checkbox, esc, formatDate, homeLabel, label, layout, selectField, serviceNames, statusLabel, statusPill, textField, type LayoutOptions } from './view.js';
-import { audit } from '../db.js';
+import { ADMIN_CSS, TOKENS_CSS } from './assets.generated.js';
 import { handleGallery } from './gallery-admin.js';
-import { publicGallery, publicMediaPath } from '../gallery.js';
+import { htmlResponse, redirect, requireCsrf, type AdminCtx, type AdminResponse } from './context.js';
 
-export interface AdminCtx {
-  method: string;
-  path: string;
-  query: URLSearchParams;
-  body: Record<string, string>;
-  cookies: Record<string, string>;
-  headers: Record<string, string | undefined>;
-  ip: string;
-  cfg: Config;
-  db: Db;
-  req: NodeJS.ReadableStream & { headers: Record<string, string | string[] | undefined> };
-}
-
-export interface AdminResponse {
-  status: number;
-  html?: string;
-  headers?: Record<string, string>;
-  file?: { path: string; mime: string; name: string; inline: boolean };
-}
-
-const SESSION_COOKIE_DEV = 'bridiant_admin';
-const SESSION_COOKIE_PROD = '__Host-bridiant_admin';
+export const SESSION_COOKIE_DEV = 'bridiant_admin';
+export const SESSION_COOKIE_PROD = '__Host-bridiant_admin';
 const LANG_COOKIE = 'bridiant_lang';
 const PAGE_SIZE = 25;
 
-export function sessionCookieName(cfg: Config): string {
+export function sessionCookieName(cfg: { env: string }): string {
   return cfg.env === 'production' ? SESSION_COOKIE_PROD : SESSION_COOKIE_DEV;
 }
 
-function cookieAttrs(cfg: Config, maxAge: number): string {
-  return `Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${cfg.cookieSecure ? '; Secure' : ''}`;
-}
-
-function redirect(location: string, extra: Record<string, string> = {}): AdminResponse {
-  return { status: 303, headers: { Location: location, ...extra } };
-}
-
-function html(status: number, body: string, extra: Record<string, string> = {}): AdminResponse {
-  return { status, html: body, headers: extra };
+function cookieAttrs(cookieSecure: boolean, maxAge: number): string {
+  return `Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${cookieSecure ? '; Secure' : ''}`;
 }
 
 function langOf(ctx: AdminCtx): AdminLang {
@@ -58,182 +26,20 @@ function langOf(ctx: AdminCtx): AdminLang {
 }
 
 function flashFrom(ctx: AdminCtx, lang: AdminLang): LayoutOptions['flash'] {
-  const key = ctx.query.get('ok');
+  if (ctx.query.get('ok') === 'saved') return { kind: 'ok', text: t(lang, 'saved') };
   const err = ctx.query.get('err');
-  if (key === 'saved') return { kind: 'ok', text: t(lang, 'saved') };
   if (err) return { kind: 'error', text: err };
   return null;
 }
 
-function page(ctx: AdminCtx, lang: AdminLang, o: Omit<LayoutOptions, 'lang' | 'path' | 'signedIn' | 'csrf'> & { csrf?: string | null; signedIn?: boolean }): AdminResponse {
-  return html(200, layout({ ...o, lang, path: ctx.path, signedIn: o.signedIn ?? true, csrf: o.csrf ?? null }));
-}
-
-function requireCsrf(ctx: AdminCtx, csrf: string): boolean {
-  return typeof ctx.body.csrf === 'string' && ctx.body.csrf.length > 0 && ctx.body.csrf === csrf;
-}
-
 /** Login POSTs must come from this site. A cross-site form cannot pass this check. */
 function sameOrigin(ctx: AdminCtx): boolean {
-  const origin = ctx.headers.origin;
-  const host = ctx.headers.host;
-  if (!origin) return true;
+  if (!ctx.origin) return true;
   try {
-    return new URL(origin).host === host;
+    return new URL(ctx.origin).host === ctx.host;
   } catch {
     return false;
   }
-}
-
-export async function handleAdmin(ctx: AdminCtx): Promise<AdminResponse> {
-  const { method, path, db, cfg } = ctx;
-  const lang = langOf(ctx);
-
-  // Static assets and language switch need no session.
-  if (method === 'GET' && path === '/admin/static/admin.css') return { status: 200, file: { path: join(cfg.adminStaticDir, 'admin.css'), mime: 'text/css; charset=utf-8', name: 'admin.css', inline: true } };
-  if (method === 'GET' && path === '/admin/static/tokens.css') return { status: 200, file: { path: cfg.tokensCssPath, mime: 'text/css; charset=utf-8', name: 'tokens.css', inline: true } };
-  if (method === 'GET' && path === '/admin/lang') {
-    const to = ctx.query.get('to') === 'es' ? 'es' : 'en';
-    const next = ctx.query.get('next') ?? '/admin/login';
-    const safeNext = next.startsWith('/admin') && !next.startsWith('//') ? next : '/admin/login';
-    return redirect(safeNext, { 'Set-Cookie': `${LANG_COOKIE}=${to}; Path=/; SameSite=Strict; Max-Age=31536000${cfg.cookieSecure ? '; Secure' : ''}` });
-  }
-
-  if (path === '/admin/login' || path === '/admin' || path === '/admin/') {
-    if (method === 'GET' && (path === '/admin' || path === '/admin/')) return redirect('/admin/requests');
-    const existing = getSession(db, ctx.cookies[sessionCookieName(cfg)]);
-    if (method === 'GET' && path === '/admin/login') {
-      if (existing) return redirect('/admin/requests');
-      return page(ctx, lang, { title: t(lang, 'login'), body: loginForm(lang, null), signedIn: false, flash: ctx.query.get('expired') ? { kind: 'error', text: t(lang, 'sessionEnded') } : null, csrf: null });
-    }
-  }
-
-  if (method === 'POST' && path === '/admin/login') {
-    if (!sameOrigin(ctx)) return html(403, loginPage(lang, t(lang, 'forbidden')));
-    const result = await login(db, cfg, {
-      username: ctx.body.username ?? '',
-      password: ctx.body.password ?? '',
-      code: ctx.body.code ?? '',
-      ip: ctx.ip,
-    });
-    if (!result.ok || !result.token) return html(401, loginPage(lang, t(lang, 'loginFailed')));
-    return redirect('/admin/requests', {
-      'Set-Cookie': `${sessionCookieName(cfg)}=${result.token}; ${cookieAttrs(cfg, Math.floor(SESSION_ABSOLUTE_MS / 1000))}`,
-    });
-  }
-
-  // Everything below requires a valid owner session.
-  const session = getSession(db, ctx.cookies[sessionCookieName(cfg)]);
-  if (!session) {
-    if (method === 'GET') return redirect('/admin/login?expired=1');
-    return redirect('/admin/login?expired=1', { 'Set-Cookie': `${sessionCookieName(cfg)}=; ${cookieAttrs(cfg, 0)}` });
-  }
-  const csrf = session.csrf;
-
-  if (method === 'POST' && path === '/admin/logout') {
-    if (!requireCsrf(ctx, csrf)) return html(403, loginPage(lang, t(lang, 'forbidden')));
-    logout(db, ctx.cookies[sessionCookieName(cfg)]);
-    return redirect('/admin/login', { 'Set-Cookie': `${sessionCookieName(cfg)}=; ${cookieAttrs(cfg, 0)}` });
-  }
-
-  const base = { lang, csrf, signedIn: true as const, path, flash: flashFrom(ctx, lang) };
-
-  if (path.startsWith('/admin/gallery')) {
-    const gallery = await handleGallery({ method, path, query: ctx.query, body: ctx.body, cfg, db, req: ctx.req as never }, { lang, csrf, path, username: session.username });
-    if (gallery) return gallery as AdminResponse;
-  }
-
-  // ---------- Requests ----------
-  if (method === 'GET' && path === '/admin/requests') return requestList(ctx, base);
-
-  const detail = /^\/admin\/requests\/(\d+)$/.exec(path);
-  if (method === 'GET' && detail) return requestDetail(ctx, Number(detail[1]), base);
-
-  const statusPost = /^\/admin\/requests\/(\d+)\/status$/.exec(path);
-  if (method === 'POST' && statusPost) {
-    if (!requireCsrf(ctx, csrf)) return html(403, layout({ ...base, title: t(lang, 'forbidden'), body: '', path }));
-    return changeStatus(ctx, Number(statusPost[1]), lang);
-  }
-
-  const notePost = /^\/admin\/requests\/(\d+)\/notes$/.exec(path);
-  if (method === 'POST' && notePost) {
-    if (!requireCsrf(ctx, csrf)) return html(403, layout({ ...base, title: t(lang, 'forbidden'), body: '', path }));
-    return addNote(ctx, Number(notePost[1]), session.username, lang);
-  }
-
-  const photo = /^\/admin\/requests\/(\d+)\/photos\/(\d+)$/.exec(path);
-  if (method === 'GET' && photo) {
-    const row = db.prepare('SELECT p.storage_name, p.mime, p.display_name FROM request_photo p WHERE p.id = ? AND p.request_id = ?').get(Number(photo[2]), Number(photo[1])) as
-      | { storage_name: string; mime: string; display_name: string }
-      | undefined;
-    if (!row) return { status: 404, html: 'Not found' };
-    audit(db, 'photo_viewed', 'request_photo', photo[2] ?? null);
-    return { status: 200, file: { path: join(cfg.privateDir, row.storage_name), mime: row.mime, name: row.display_name, inline: true } };
-  }
-
-  // ---------- Welcome Center ----------
-  if (method === 'GET' && path === '/admin/welcome') return welcomeList(ctx, base);
-  if (method === 'GET' && path === '/admin/welcome/new') return page(ctx, lang, { ...base, title: t(lang, 'newResource'), body: resourceForm(lang, csrf, null, null) });
-  if (method === 'POST' && path === '/admin/welcome') {
-    if (!requireCsrf(ctx, csrf)) return html(403, layout({ ...base, title: t(lang, 'forbidden'), body: '', path }));
-    const parsed = parseResourceInput(ctx.body);
-    if (!parsed.ok) return redirect('/admin/welcome/new?err=' + encodeURIComponent(parsed.code));
-    const id = createResource(db, parsed.value);
-    return redirect(`/admin/welcome/${id}?ok=saved`);
-  }
-
-  const resource = /^\/admin\/welcome\/(\d+)$/.exec(path);
-  if (method === 'GET' && resource) {
-    const row = getResource(db, Number(resource[1]));
-    if (!row) return page(ctx, lang, { ...base, title: t(lang, 'notFound'), body: `<p>${esc(t(lang, 'notFound'))}</p>` });
-    return page(ctx, lang, { ...base, title: row.title_en || row.title_es || 'Resource', body: resourceForm(lang, csrf, row, ctx.query.get('ok')) });
-  }
-  if (method === 'POST' && resource) {
-    if (!requireCsrf(ctx, csrf)) return html(403, layout({ ...base, title: t(lang, 'forbidden'), body: '', path }));
-    const id = Number(resource[1]);
-    if (!getResource(db, id)) return redirect('/admin/welcome?err=' + encodeURIComponent('not_found'));
-    const parsed = parseResourceInput(ctx.body);
-    if (!parsed.ok) return redirect(`/admin/welcome/${id}?err=${encodeURIComponent(parsed.code)}`);
-    updateResource(db, id, parsed.value);
-    setApproval(db, id, 'en', ctx.body.approvedEn === '1' && parsed.value.titleEn.length > 0);
-    setApproval(db, id, 'es', ctx.body.approvedEs === '1' && parsed.value.titleEs.length > 0);
-    const approvedAny = ctx.body.approvedEn === '1' || ctx.body.approvedEs === '1';
-    if (ctx.body.published === '1' && !approvedAny) {
-      setPublished(db, id, false);
-      return redirect(`/admin/welcome/${id}?err=${encodeURIComponent(t(lang, 'publishNeedsApproval'))}`);
-    }
-    setPublished(db, id, ctx.body.published === '1');
-    return redirect(`/admin/welcome/${id}?ok=saved`);
-  }
-
-  const upload = /^\/admin\/welcome\/(\d+)\/document$/.exec(path);
-  if (method === 'POST' && upload) {
-    // Multipart: the CSRF token travels as a form field, checked before the file is stored.
-    const parsed = await parseMultipart(ctx.req as never, cfg).catch((e: unknown) => (e instanceof UploadError ? e : null));
-    if (!parsed || parsed instanceof UploadError) return redirect(`/admin/welcome/${upload[1]}?err=${encodeURIComponent('upload_failed')}`);
-    if (parsed.fields.csrf !== csrf) return html(403, layout({ ...base, title: t(lang, 'forbidden'), body: '', path }));
-    const file = parsed.files[0];
-    if (!file) return redirect(`/admin/welcome/${upload[1]}?err=${encodeURIComponent('unsupported_file')}`);
-    try {
-      await attachDocument(db, cfg, Number(upload[1]), file.buffer);
-      return redirect(`/admin/welcome/${upload[1]}?ok=saved`);
-    } catch (error) {
-      const code = error instanceof Error ? error.message : 'upload_failed';
-      return redirect(`/admin/welcome/${upload[1]}?err=${encodeURIComponent(code)}`);
-    }
-  }
-
-  // ---------- Gallery and system ----------
-  if (method === 'POST' && path === '/admin/status/send-queue') {
-    if (!requireCsrf(ctx, csrf)) return html(403, layout({ ...base, title: t(lang, 'forbidden'), body: '', path }));
-    if (ctx.body.action === 'retry') retryFailedEmails(db);
-    const result = await processOutbox(db, senderFor(cfg));
-    audit(db, 'email_queue_processed', 'email_outbox', null, { sent: result.sent, failed: result.failed });
-    return redirect('/admin/status?ok=saved');
-  }
-  if (method === 'GET' && path === '/admin/status') return systemStatus(ctx, base);
-
-  return { status: 404, html: layout({ ...base, title: t(lang, 'notFound'), body: `<p>${esc(t(lang, 'notFound'))}</p>`, path }) };
 }
 
 function loginForm(lang: AdminLang, error: string | null): string {
@@ -250,11 +56,175 @@ function loginForm(lang: AdminLang, error: string | null): string {
   </section>`;
 }
 
-function loginPage(lang: AdminLang, error: string): string {
-  return layout({ lang, title: t(lang, 'login'), csrf: null, signedIn: false, path: '/admin/login', body: loginForm(lang, error) });
+function loginPage(lang: AdminLang, error: string | null, status = 200) {
+  return htmlResponse(status, layout({ lang, title: t(lang, 'login'), csrf: null, signedIn: false, path: '/admin/login', body: loginForm(lang, error) }));
 }
 
-function requestList(ctx: AdminCtx, base: { lang: AdminLang; csrf: string; signedIn: true; path: string; flash: LayoutOptions['flash'] }) {
+interface Base {
+  lang: AdminLang;
+  csrf: string;
+  path: string;
+  flash: LayoutOptions['flash'];
+}
+
+function view(base: Base, o: { title: string; body: string; nav?: string; flash?: LayoutOptions['flash'] }): AdminResponse {
+  return htmlResponse(
+    200,
+    layout({ lang: base.lang, title: o.title, csrf: base.csrf, signedIn: true, activeNav: o.nav, path: base.path, flash: o.flash ?? base.flash, body: o.body }),
+  );
+}
+
+/** Serves the panel's own stylesheets. They are compiled into the bundle, so no filesystem is needed. */
+function staticAsset(path: string): AdminResponse | null {
+  if (path === '/admin/static/admin.css') return { status: 200, html: ADMIN_CSS, headers: { 'Content-Type': 'text/css; charset=utf-8', 'Cache-Control': 'public, max-age=300' } };
+  if (path === '/admin/static/tokens.css') return { status: 200, html: TOKENS_CSS, headers: { 'Content-Type': 'text/css; charset=utf-8', 'Cache-Control': 'public, max-age=300' } };
+  return null;
+}
+
+export async function handleAdmin(ctx: AdminCtx): Promise<AdminResponse> {
+  const { method, path, db, cfg, input } = ctx;
+  const cookieName = sessionCookieName(cfg);
+  const lang = langOf(ctx);
+
+  const asset = method === 'GET' ? staticAsset(path) : null;
+  if (asset) return asset;
+
+  if (method === 'GET' && path === '/admin/lang') {
+    const to = ctx.query.get('to') === 'es' ? 'es' : 'en';
+    const next = ctx.query.get('next') ?? '/admin/login';
+    const safeNext = next.startsWith('/admin') && !next.startsWith('//') ? next : '/admin/login';
+    return redirect(safeNext, { 'Set-Cookie': `${LANG_COOKIE}=${to}; Path=/; SameSite=Strict; Max-Age=31536000${cfg.cookieSecure ? '; Secure' : ''}` });
+  }
+  if (method === 'GET' && (path === '/admin' || path === '/admin/')) return redirect('/admin/requests');
+
+  if (method === 'GET' && path === '/admin/login') {
+    if (await getSession(db, ctx.cookies[cookieName])) return redirect('/admin/requests');
+    const expired = ctx.query.get('expired') ? t(lang, 'sessionEnded') : null;
+    return loginPage(lang, expired);
+  }
+
+  if (method === 'POST' && path === '/admin/login') {
+    if (!sameOrigin(ctx)) return loginPage(lang, t(lang, 'forbidden'), 403);
+    const result = await login(db, cfg, { username: input.fields.username ?? '', password: input.fields.password ?? '', code: input.fields.code ?? '', ip: ctx.ip });
+    if (!result.ok || !result.token) return loginPage(lang, t(lang, 'loginFailed'), 401);
+    return redirect('/admin/requests', { 'Set-Cookie': `${cookieName}=${result.token}; ${cookieAttrs(cfg.cookieSecure, Math.floor(SESSION_ABSOLUTE_MS / 1000))}` });
+  }
+
+  // Everything below requires a valid owner session.
+  const session = await getSession(db, ctx.cookies[cookieName]);
+  if (!session) {
+    if (method === 'GET') return redirect('/admin/login?expired=1');
+    return redirect('/admin/login?expired=1', { 'Set-Cookie': `${cookieName}=; ${cookieAttrs(cfg.cookieSecure, 0)}` });
+  }
+  const csrf = session.csrf;
+  const base: Base = { lang, csrf, path, flash: flashFrom(ctx, lang) };
+
+  if (method === 'POST' && path === '/admin/logout') {
+    if (!requireCsrf(input, csrf)) return htmlResponse(403, layout({ lang, title: t(lang, 'forbidden'), csrf: null, signedIn: false, path, body: `<p>${esc(t(lang, 'forbidden'))}</p>` }));
+    await logout(db, ctx.cookies[cookieName]);
+    return redirect('/admin/login', { 'Set-Cookie': `${cookieName}=; ${cookieAttrs(cfg.cookieSecure, 0)}` });
+  }
+
+  const forbidden = () => htmlResponse(403, layout({ lang, title: t(lang, 'forbidden'), csrf, signedIn: true, path, body: `<p>${esc(t(lang, 'forbidden'))}</p>` }));
+
+  // ---------- Gallery (delegated) ----------
+  if (path.startsWith('/admin/gallery')) {
+    const gallery = await handleGallery(ctx, { lang, csrf, path });
+    if (gallery) return gallery as AdminResponse;
+  }
+
+  // ---------- Requests ----------
+  if (method === 'GET' && path === '/admin/requests') return requestList(ctx, base);
+
+  const detail = /^\/admin\/requests\/(\d+)$/.exec(path);
+  if (method === 'GET' && detail) return requestDetail(ctx, Number(detail[1]), base);
+
+  const statusPost = /^\/admin\/requests\/(\d+)\/status$/.exec(path);
+  if (method === 'POST' && statusPost) {
+    if (!requireCsrf(input, csrf)) return forbidden();
+    return changeStatus(ctx, Number(statusPost[1]), lang);
+  }
+
+  const notePost = /^\/admin\/requests\/(\d+)\/notes$/.exec(path);
+  if (method === 'POST' && notePost) {
+    if (!requireCsrf(input, csrf)) return forbidden();
+    return addNote(ctx, Number(notePost[1]), session.username, lang);
+  }
+
+  const photo = /^\/admin\/requests\/(\d+)\/photos\/(\d+)$/.exec(path);
+  if (method === 'GET' && photo) {
+    const row = await db.first<{ storage_name: string; mime: string; display_name: string }>(
+      'SELECT storage_name, mime, display_name FROM request_photo WHERE id = ? AND request_id = ?',
+      [Number(photo[2]), Number(photo[1])],
+    );
+    if (!row) return { status: 404, html: 'Not found' };
+    await audit(db, 'photo_viewed', 'request_photo', photo[2] ?? null);
+    return { status: 200, file: { key: row.storage_name, mime: row.mime, name: row.display_name, inline: true } };
+  }
+
+  // ---------- Welcome Center ----------
+  if (method === 'GET' && path === '/admin/welcome') return welcomeList(ctx, base);
+  if (method === 'GET' && path === '/admin/welcome/new') return view(base, { title: t(lang, 'newResource'), nav: 'welcome', body: resourceForm(lang, csrf, null, null) });
+  if (method === 'POST' && path === '/admin/welcome') {
+    if (!requireCsrf(input, csrf)) return forbidden();
+    const parsed = parseResourceInput(input.fields);
+    if (!parsed.ok) return redirect('/admin/welcome/new?err=' + encodeURIComponent(parsed.code));
+    const id = await createResource(db, parsed.value);
+    return redirect(`/admin/welcome/${id}?ok=saved`);
+  }
+
+  const resource = /^\/admin\/welcome\/(\d+)$/.exec(path);
+  if (method === 'GET' && resource) {
+    const row = await getResource(db, Number(resource[1]));
+    if (!row) return view(base, { title: t(lang, 'notFound'), body: `<p>${esc(t(lang, 'notFound'))}</p>` });
+    return view(base, { title: row.title_en || row.title_es || 'Resource', nav: 'welcome', body: resourceForm(lang, csrf, row, ctx.query.get('ok')) });
+  }
+  if (method === 'POST' && resource) {
+    if (!requireCsrf(input, csrf)) return forbidden();
+    const id = Number(resource[1]);
+    if (!(await getResource(db, id))) return redirect('/admin/welcome?err=' + encodeURIComponent('not_found'));
+    const parsed = parseResourceInput(input.fields);
+    if (!parsed.ok) return redirect(`/admin/welcome/${id}?err=${encodeURIComponent(parsed.code)}`);
+    await updateResource(db, id, parsed.value);
+    await setApproval(db, id, 'en', input.fields.approvedEn === '1' && parsed.value.titleEn.length > 0);
+    await setApproval(db, id, 'es', input.fields.approvedEs === '1' && parsed.value.titleEs.length > 0);
+    const approvedAny = input.fields.approvedEn === '1' || input.fields.approvedEs === '1';
+    if (input.fields.published === '1' && !approvedAny) {
+      await setPublished(db, id, false);
+      return redirect(`/admin/welcome/${id}?err=${encodeURIComponent(t(lang, 'publishNeedsApproval'))}`);
+    }
+    await setPublished(db, id, input.fields.published === '1');
+    return redirect(`/admin/welcome/${id}?ok=saved`);
+  }
+
+  const upload = /^\/admin\/welcome\/(\d+)\/document$/.exec(path);
+  if (method === 'POST' && upload) {
+    if (!requireCsrf(input, csrf)) return forbidden();
+    const file = input.files.document?.[0];
+    if (!file) return redirect(`/admin/welcome/${upload[1]}?err=${encodeURIComponent('unsupported_file')}`);
+    try {
+      await attachDocument(db, cfg, ctx.files, Number(upload[1]), await file.data());
+      return redirect(`/admin/welcome/${upload[1]}?ok=saved`);
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'upload_failed';
+      return redirect(`/admin/welcome/${upload[1]}?err=${encodeURIComponent(code)}`);
+    }
+  }
+
+  // ---------- System ----------
+  if (method === 'POST' && path === '/admin/status/send-queue') {
+    if (!requireCsrf(input, csrf)) return forbidden();
+    if (input.fields.action === 'retry') await retryFailedEmails(db);
+    const result = await processOutbox(db, senderFor(cfg));
+    await audit(db, 'email_queue_processed', 'email_outbox', null, { sent: result.sent, failed: result.failed });
+    return redirect('/admin/status?ok=saved');
+  }
+  if (method === 'GET' && path === '/admin/status') return systemStatus(ctx, base);
+
+  return htmlResponse(404, layout({ lang, title: t(lang, 'notFound'), csrf, signedIn: true, path, body: `<p>${esc(t(lang, 'notFound'))}</p>` }));
+}
+
+async function requestList(ctx: AdminCtx, base: Base): Promise<AdminResponse> {
   const { db, query } = ctx;
   const { lang } = base;
   const q = (query.get('q') ?? '').trim().slice(0, 80);
@@ -284,12 +254,13 @@ function requestList(ctx: AdminCtx, base: { lang: AdminLang; csrf: string; signe
   }
   where.push('archived_at IS NULL');
   const clause = `WHERE ${where.join(' AND ')}`;
-  const total = (db.prepare(`SELECT COUNT(*) AS n FROM estimate_request ${clause}`).get(...params) as { n: number }).n;
-  const rows = db
-    .prepare(`SELECT id, name, email, services, received_at, status, reviewed_at FROM estimate_request ${clause} ORDER BY received_at DESC, id DESC LIMIT ? OFFSET ?`)
-    .all(...params, PAGE_SIZE, (pageNo - 1) * PAGE_SIZE) as Array<{ id: number; name: string; email: string | null; services: string; received_at: string; status: string; reviewed_at: string | null }>;
+  const total = (await db.first<{ n: number }>(`SELECT COUNT(*) AS n FROM estimate_request ${clause}`, params))?.n ?? 0;
+  const rows = await db.all<{ id: number; name: string; services: string; received_at: string; status: string; reviewed_at: string | null }>(
+    `SELECT id, name, services, received_at, status, reviewed_at FROM estimate_request ${clause} ORDER BY received_at DESC, id DESC LIMIT ? OFFSET ?`,
+    [...params, PAGE_SIZE, (pageNo - 1) * PAGE_SIZE],
+  );
+  const counts = (await db.first<{ n: number }>('SELECT COUNT(*) AS n FROM estimate_request WHERE status = ? AND archived_at IS NULL', ['new'])) ?? { n: 0 };
 
-  const counts = db.prepare('SELECT COUNT(*) AS n FROM estimate_request WHERE status = ? AND archived_at IS NULL').get('new') as { n: number };
   const keep = new URLSearchParams();
   if (q) keep.set('q', q);
   if (status) keep.set('status', status);
@@ -324,10 +295,7 @@ function requestList(ctx: AdminCtx, base: { lang: AdminLang; csrf: string; signe
       .map(
         (r) => `<li class="card item">
           <a class="item__link" href="/admin/requests/${r.id}">
-            <span class="item__top">
-              <strong>${esc(r.name)}</strong>
-              ${statusPill(r.status, lang)}
-            </span>
+            <span class="item__top"><strong>${esc(r.name)}</strong>${statusPill(r.status, lang)}</span>
             <span class="muted">${esc(serviceNames(JSON.parse(r.services) as string[], lang))}</span>
             <span class="item__meta">${esc(formatDate(r.received_at, lang))}${r.reviewed_at ? '' : ` · <em>${esc(t(lang, 'unreviewed'))}</em>`}</span>
           </a>
@@ -340,24 +308,30 @@ function requestList(ctx: AdminCtx, base: { lang: AdminLang; csrf: string; signe
     <span class="muted">${esc(t(lang, 'pageOf'))} ${pageNo} / ${pages}</span>
     ${pageNo < pages ? `<a class="btn btn--ghost" href="${pageLink(pageNo + 1)}">${esc(t(lang, 'next'))}</a>` : ''}
   </nav>`;
-  return html(200, layout({ ...base, activeNav: 'requests', title: t(lang, 'navRequests'), body, path: base.path, csrf: base.csrf, signedIn: true, flash: base.flash, lang }));
+  return view(base, { title: t(lang, 'navRequests'), nav: 'requests', body });
 }
 
-function requestDetail(ctx: AdminCtx, id: number, base: { lang: AdminLang; csrf: string; signedIn: true; path: string; flash: LayoutOptions['flash'] }) {
+async function requestDetail(ctx: AdminCtx, id: number, base: Base): Promise<AdminResponse> {
   const { db, cfg } = ctx;
+  void cfg;
   const { lang, csrf } = base;
-  const r = db.prepare('SELECT * FROM estimate_request WHERE id = ?').get(id) as Record<string, string | number | null> | undefined;
-  if (!r) return html(404, layout({ ...base, activeNav: 'requests', title: t(lang, 'notFound'), body: `<p>${esc(t(lang, 'notFound'))}</p>`, path: base.path, csrf, signedIn: true, lang }));
+  const r = await db.first<Record<string, string | number | null>>('SELECT * FROM estimate_request WHERE id = ?', [id]);
+  if (!r) return htmlResponse(404, layout({ lang, title: t(lang, 'notFound'), csrf, signedIn: true, activeNav: 'requests', path: base.path, body: `<p>${esc(t(lang, 'notFound'))}</p>` }));
 
   if (!r.reviewed_at) {
     const now = nowIso();
-    db.prepare('UPDATE estimate_request SET reviewed_at = ? WHERE id = ?').run(now, id);
-    db.prepare('INSERT INTO request_event (request_id, kind, actor, created_at) VALUES (?, ?, ?, ?)').run(id, 'viewed', 'owner', now);
+    await db.batch([
+      { sql: 'UPDATE estimate_request SET reviewed_at = ? WHERE id = ?', params: [now, id] },
+      { sql: "INSERT INTO request_event (request_id, kind, actor, created_at) VALUES (?, 'viewed', 'owner', ?)", params: [id, now] },
+    ]);
   }
 
-  const photos = db.prepare('SELECT id, display_name, mime, bytes, created_at FROM request_photo WHERE request_id = ? ORDER BY id').all(id) as Array<{ id: number; display_name: string; mime: string; bytes: number; created_at: string }>;
-  const notes = db.prepare('SELECT body, author, created_at FROM request_note WHERE request_id = ? ORDER BY id DESC').all(id) as Array<{ body: string; author: string; created_at: string }>;
-  const events = db.prepare('SELECT kind, from_value, to_value, actor, created_at FROM request_event WHERE request_id = ? ORDER BY id DESC').all(id) as Array<{ kind: string; from_value: string | null; to_value: string | null; actor: string; created_at: string }>;
+  const photos = await db.all<{ id: number; display_name: string; bytes: number }>('SELECT id, display_name, bytes FROM request_photo WHERE request_id = ? ORDER BY id', [id]);
+  const notes = await db.all<{ body: string; author: string; created_at: string }>('SELECT body, author, created_at FROM request_note WHERE request_id = ? ORDER BY id DESC', [id]);
+  const events = await db.all<{ kind: string; from_value: string | null; to_value: string | null; actor: string; created_at: string }>(
+    'SELECT kind, from_value, to_value, actor, created_at FROM request_event WHERE request_id = ? ORDER BY id DESC',
+    [id],
+  );
   const services = JSON.parse(String(r.services ?? '[]')) as string[];
   const freq = r.frequency ? label(FREQUENCY_LABELS, String(r.frequency), lang) : '';
   const status = String(r.status);
@@ -369,7 +343,6 @@ function requestDetail(ctx: AdminCtx, id: number, base: { lang: AdminLang; csrf:
     <p class="muted">${esc(serviceNames(services, lang))}</p>
     <p class="item__meta">${esc(t(lang, 'received'))}: ${esc(formatDate(String(r.received_at), lang))}</p>
   </section>
-
   <section class="card">
     <h2>${esc(t(lang, 'contact'))}</h2>
     <dl class="facts">
@@ -379,7 +352,6 @@ function requestDetail(ctx: AdminCtx, id: number, base: { lang: AdminLang; csrf:
       <dt>${esc(t(lang, 'zip'))}</dt><dd>${esc(r.zip) || '—'}</dd>
     </dl>
   </section>
-
   <section class="card">
     <h2>${esc(t(lang, 'answers'))}</h2>
     <dl class="facts">
@@ -393,15 +365,11 @@ function requestDetail(ctx: AdminCtx, id: number, base: { lang: AdminLang; csrf:
     </dl>
     ${r.notes ? `<h3>${esc(t(lang, 'notes'))}</h3><p class="pre">${esc(r.notes)}</p>` : ''}
   </section>
-
   <section class="card">
     <h2>${esc(t(lang, 'photos'))}</h2>
     ${photos.length === 0 ? `<p class="muted">${esc(t(lang, 'noPhotos'))}</p>` : `<p class="muted small">${esc(t(lang, 'photoNote'))}</p>
-    <ul class="photos">${photos
-      .map((p) => `<li><a href="/admin/requests/${id}/photos/${p.id}" target="_blank" rel="noopener"><span>${esc(p.display_name)}</span><small>${Math.round(p.bytes / 1024)} KB</small></a></li>`)
-      .join('')}</ul>`}
+    <ul class="photos">${photos.map((p) => `<li><a href="/admin/requests/${id}/photos/${p.id}" target="_blank" rel="noopener"><span>${esc(p.display_name)}</span><small>${Math.round(p.bytes / 1024)} KB</small></a></li>`).join('')}</ul>`}
   </section>
-
   <section class="card">
     <h2>${esc(t(lang, 'changeStatus'))}</h2>
     <form method="post" action="/admin/requests/${id}/status" class="row">
@@ -410,7 +378,6 @@ function requestDetail(ctx: AdminCtx, id: number, base: { lang: AdminLang; csrf:
       <button class="btn btn--primary" type="submit">${esc(t(lang, 'saveResource'))}</button>
     </form>
   </section>
-
   <section class="card">
     <h2>${esc(t(lang, 'internalNotes'))}</h2>
     <p class="muted small">${esc(t(lang, 'internalNotesHelp'))}</p>
@@ -419,11 +386,8 @@ function requestDetail(ctx: AdminCtx, id: number, base: { lang: AdminLang; csrf:
       <label class="field"><span>${esc(t(lang, 'addNote'))}</span><textarea name="body" rows="3" maxlength="2000" required></textarea></label>
       <button class="btn btn--primary" type="submit">${esc(t(lang, 'addNote'))}</button>
     </form>
-    ${notes.length === 0 ? `<p class="muted">${esc(t(lang, 'noNotes'))}</p>` : `<ul class="timeline">${notes
-      .map((n) => `<li><p class="pre">${esc(n.body)}</p><small class="muted">${esc(n.author)} · ${esc(formatDate(n.created_at, lang))}</small></li>`)
-      .join('')}</ul>`}
+    ${notes.length === 0 ? `<p class="muted">${esc(t(lang, 'noNotes'))}</p>` : `<ul class="timeline">${notes.map((n) => `<li><p class="pre">${esc(n.body)}</p><small class="muted">${esc(n.author)} · ${esc(formatDate(n.created_at, lang))}</small></li>`).join('')}</ul>`}
   </section>
-
   <section class="card">
     <h2>${esc(t(lang, 'history'))}</h2>
     <ul class="timeline">${events
@@ -434,51 +398,41 @@ function requestDetail(ctx: AdminCtx, id: number, base: { lang: AdminLang; csrf:
       })
       .join('')}</ul>
   </section>`;
-
-  return html(200, layout({ ...base, activeNav: 'requests', title: String(r.name), body, path: base.path, csrf, signedIn: true, flash: base.flash, lang }));
+  return view(base, { title: String(r.name), nav: 'requests', body });
 }
 
-function changeStatus(ctx: AdminCtx, id: number, lang: AdminLang): AdminResponse {
-  const next = ctx.body.status as RequestStatus;
+async function changeStatus(ctx: AdminCtx, id: number, lang: AdminLang): Promise<AdminResponse> {
+  const next = ctx.input.fields.status as RequestStatus;
   if (!(REQUEST_STATUSES as readonly string[]).includes(next)) return redirect(`/admin/requests/${id}?err=${encodeURIComponent('invalid_status')}`);
-  const current = ctx.db.prepare('SELECT status FROM estimate_request WHERE id = ?').get(id) as { status: string } | undefined;
+  const current = await ctx.db.first<{ status: string }>('SELECT status FROM estimate_request WHERE id = ?', [id]);
   if (!current) return redirect('/admin/requests?err=not_found');
   if (current.status !== next) {
     const now = nowIso();
-    ctx.db.exec('BEGIN IMMEDIATE');
-    try {
-      ctx.db.prepare('UPDATE estimate_request SET status = ? WHERE id = ?').run(next, id);
-      ctx.db.prepare('INSERT INTO request_event (request_id, kind, from_value, to_value, actor, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(id, 'status_changed', current.status, next, 'owner', now);
-      ctx.db.exec('COMMIT');
-    } catch (error) {
-      ctx.db.exec('ROLLBACK');
-      throw error;
-    }
+    await ctx.db.batch([
+      { sql: 'UPDATE estimate_request SET status = ? WHERE id = ?', params: [next, id] },
+      { sql: "INSERT INTO request_event (request_id, kind, from_value, to_value, actor, created_at) VALUES (?, 'status_changed', ?, ?, 'owner', ?)", params: [id, current.status, next, now] },
+    ]);
   }
+  void lang;
   return redirect(`/admin/requests/${id}?ok=saved`);
 }
 
-function addNote(ctx: AdminCtx, id: number, author: string, lang: AdminLang): AdminResponse {
-  const body = (ctx.body.body ?? '').trim();
+async function addNote(ctx: AdminCtx, id: number, author: string, lang: AdminLang): Promise<AdminResponse> {
+  const body = (ctx.input.fields.body ?? '').trim();
   if (body.length === 0) return redirect(`/admin/requests/${id}?err=${encodeURIComponent(t(lang, 'noteEmpty'))}`);
-  const now = nowIso();
-  const exists = ctx.db.prepare('SELECT id FROM estimate_request WHERE id = ?').get(id);
+  const exists = await ctx.db.first('SELECT id FROM estimate_request WHERE id = ?', [id]);
   if (!exists) return redirect('/admin/requests?err=not_found');
-  ctx.db.exec('BEGIN IMMEDIATE');
-  try {
-    ctx.db.prepare('INSERT INTO request_note (request_id, body, author, created_at) VALUES (?, ?, ?, ?)').run(id, body.slice(0, 2000), author, now);
-    ctx.db.prepare('INSERT INTO request_event (request_id, kind, actor, created_at) VALUES (?, ?, ?, ?)').run(id, 'note_added', 'owner', now);
-    ctx.db.exec('COMMIT');
-  } catch (error) {
-    ctx.db.exec('ROLLBACK');
-    throw error;
-  }
+  const now = nowIso();
+  await ctx.db.batch([
+    { sql: 'INSERT INTO request_note (request_id, body, author, created_at) VALUES (?, ?, ?, ?)', params: [id, body.slice(0, 2000), author, now] },
+    { sql: "INSERT INTO request_event (request_id, kind, actor, created_at) VALUES (?, 'note_added', 'owner', ?)", params: [id, now] },
+  ]);
   return redirect(`/admin/requests/${id}?ok=saved`);
 }
 
-function welcomeList(ctx: AdminCtx, base: { lang: AdminLang; csrf: string; signedIn: true; path: string; flash: LayoutOptions['flash'] }) {
+async function welcomeList(ctx: AdminCtx, base: Base): Promise<AdminResponse> {
   const { lang, csrf } = base;
-  const rows = listResources(ctx.db);
+  const rows: ResourceRow[] = await listResources(ctx.db);
   const body = `
   <section class="card head-row">
     <h1>${esc(t(lang, 'resources'))}</h1>
@@ -494,8 +448,9 @@ function welcomeList(ctx: AdminCtx, base: { lang: AdminLang; csrf: string; signe
       </a></li>`;
     })
     .join('')}</ul>`}
-  <p class="muted small">${esc(t(lang, 'tierPending'))}</p>`;
-  return html(200, layout({ ...base, activeNav: 'welcome', title: t(lang, 'navWelcome'), body, path: base.path, csrf, signedIn: true, flash: base.flash, lang }));
+  <p class="muted small">${esc(t(lang, 'tierPending'))}</p>
+  <input type="hidden" value="${esc(csrf)}">`;
+  return view(base, { title: t(lang, 'navWelcome'), nav: 'welcome', body });
 }
 
 function resourceForm(lang: AdminLang, csrf: string, r: ResourceRow | null, ok: string | null): string {
@@ -511,11 +466,11 @@ function resourceForm(lang: AdminLang, csrf: string, r: ResourceRow | null, ok: 
     ${selectField('kind', t(lang, 'kind'), WELCOME_KINDS.map((k) => ({ value: k, label: label(KIND_LABELS, k, lang) })), kind)}
     ${selectField('accessTier', t(lang, 'tier'), ACCESS_TIERS.map((a) => ({ value: a, label: label(TIER_LABELS, a, lang) })), tier)}
     ${textField('titleEn', t(lang, 'titleEn'), r?.title_en ?? '', { max: 160 })}
+    ${textField('titleEs', t(lang, 'titleEs'), r?.title_es ?? '', { max: 160 })}
     ${textField('subtitleEn', t(lang, 'subtitleEn'), r?.subtitle_en ?? '', { max: 240 })}
     ${textField('subtitleEs', t(lang, 'subtitleEs'), r?.subtitle_es ?? '', { max: 240 })}
-    ${textField('titleEs', t(lang, 'titleEs'), r?.title_es ?? '', { max: 160 })}
-    <label class="field"><span>${esc(t(lang, 'bodyEn'))}</span><textarea name="bodyEn" rows="6" maxlength="8000">${esc(r?.body_en ?? '')}</textarea></label>
-    <label class="field"><span>${esc(t(lang, 'bodyEs'))}</span><textarea name="bodyEs" rows="6" maxlength="8000">${esc(r?.body_es ?? '')}</textarea></label>
+    <label class="field"><span>${esc(t(lang, 'bodyEn'))}</span><textarea name="bodyEn" rows="6" maxlength="12000">${esc(r?.body_en ?? '')}</textarea></label>
+    <label class="field"><span>${esc(t(lang, 'bodyEs'))}</span><textarea name="bodyEs" rows="6" maxlength="12000">${esc(r?.body_es ?? '')}</textarea></label>
     ${textField('sortOrder', t(lang, 'sortOrder'), String(r?.sort_order ?? 0), { type: 'number', inputmode: 'numeric' })}
     <p class="muted small">${esc(t(lang, 'resourceHelp'))}</p>
     <p class="muted small">${esc(t(lang, 'bodyFormatHelp'))}</p>
@@ -536,10 +491,10 @@ function resourceForm(lang: AdminLang, csrf: string, r: ResourceRow | null, ok: 
   </section>` : ''}`;
 }
 
-function systemStatus(ctx: AdminCtx, base: { lang: AdminLang; csrf: string; signedIn: true; path: string; flash: LayoutOptions['flash'] }) {
+async function systemStatus(ctx: AdminCtx, base: Base): Promise<AdminResponse> {
   const { lang, csrf } = base;
   const { cfg, db } = ctx;
-  const counts = db.prepare("SELECT status, COUNT(*) AS n FROM email_outbox GROUP BY status").all() as Array<{ status: string; n: number }>;
+  const counts = await db.all<{ status: string; n: number }>('SELECT status, COUNT(*) AS n FROM email_outbox GROUP BY status');
   const c = (s: string) => counts.find((x) => x.status === s)?.n ?? 0;
   const yes = (v: boolean) => (v ? t(lang, 'configured') : t(lang, 'notConfigured'));
   const body = `
@@ -567,15 +522,7 @@ function systemStatus(ctx: AdminCtx, base: { lang: AdminLang; csrf: string; sign
       <button class="btn btn--ghost" type="submit" name="action" value="retry">${esc(t(lang, 'retryFailed'))}</button>
     </form>
   </section>`;
-  return html(200, layout({ ...base, activeNav: 'status', title: t(lang, 'navStatus'), body, path: base.path, csrf, signedIn: true, flash: base.flash, lang }));
+  return view(base, { title: t(lang, 'navStatus'), nav: 'status', body });
 }
 
-/** Streams a private file to the panel only after the session check passed. */
-export async function fileExists(path: string): Promise<boolean> {
-  try {
-    return (await stat(path)).isFile();
-  } catch {
-    return false;
-  }
-}
-
+/** Public gallery and welcome data is read through these exports, so the public API never imports admin code. */

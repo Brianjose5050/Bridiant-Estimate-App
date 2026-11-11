@@ -1,7 +1,8 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { verifyTurnstile } from '../src/estimates.js';
 import { ResendSender, processOutbox, type EmailSender } from '../src/email.js';
-import { openDb } from '../src/db.js';
+import { migrate } from '../src/db.js';
+import { sqliteDb } from '../src/node/sqlite-db.js';
 import { mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -50,14 +51,15 @@ describe('Resend adapter (mocked network; no account used)', () => {
   });
 
   it('keeps a message queued after a provider failure and marks it failed after three attempts', async () => {
-    const db = openDb(join(mkdtempSync(join(tmpdir(), 'mail-')), 'm.sqlite'));
-    db.prepare("INSERT INTO email_outbox (kind, locale, recipient, subject, body_text, status, created_at) VALUES ('owner_alert', 'en', 'o@example.invalid', 's', 'b', 'queued', ?)").run(new Date().toISOString());
+    const db = sqliteDb(join(mkdtempSync(join(tmpdir(), 'mail-')), 'm.sqlite'));
+    await migrate(db);
+    await db.run("INSERT INTO email_outbox (kind, locale, recipient, subject, body_text, status, created_at) VALUES ('owner_alert', 'en', 'o@example.invalid', 's', 'b', 'queued', ?)", [new Date().toISOString()]);
     const failing: EmailSender = { send: async () => { throw new Error('provider_http_500'); } };
     await processOutbox(db, failing);
     await processOutbox(db, failing);
-    expect((db.prepare("SELECT status, attempts FROM email_outbox").get() as { status: string; attempts: number })).toEqual({ status: 'queued', attempts: 2 });
+    expect(await db.first<{ status: string; attempts: number }>('SELECT status, attempts FROM email_outbox')).toEqual({ status: 'queued', attempts: 2 });
     await processOutbox(db, failing);
-    expect((db.prepare("SELECT status FROM email_outbox").get() as { status: string }).status).toBe('failed');
+    expect((await db.first<{ status: string }>('SELECT status FROM email_outbox'))?.status).toBe('failed');
     db.close();
   });
 });

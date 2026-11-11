@@ -3,8 +3,8 @@ import { join } from 'node:path';
 import { existsSync, readdirSync } from 'node:fs';
 import { startHarness, signIn, jpeg, png, pdf, type Harness } from './helpers.js';
 
-function count(h: Harness, sql: string): number {
-  return (h.db.prepare(sql).get() as { n: number }).n;
+async function count(h: Harness, sql: string): Promise<number> {
+  return ((await h.db.first(sql, [])) as { n: number }).n;
 }
 
 async function upload(h: Harness, cookie: string, csrf: string, files: Array<{ name: string; data: Buffer; type: string }>): Promise<Response> {
@@ -69,18 +69,18 @@ describe('gallery: nothing is public without owner approval', () => {
       { name: 'bath.png', data: png(), type: 'image/png' },
     ]);
     expect(r.headers.get('location')).toContain('ok=2');
-    expect(count(h, 'SELECT COUNT(*) AS n FROM gallery_photo')).toBe(2);
-    expect(count(h, "SELECT COUNT(*) AS n FROM gallery_photo WHERE kind = 'unclassified' AND review_status = 'pending'")).toBe(2);
+    expect(await count(h, 'SELECT COUNT(*) AS n FROM gallery_photo')).toBe(2);
+    expect(await count(h, "SELECT COUNT(*) AS n FROM gallery_photo WHERE kind = 'unclassified' AND review_status = 'pending'")).toBe(2);
     expect((await publicApi(h)).items).toEqual([]);
-    const stored = h.db.prepare('SELECT storage_name FROM gallery_photo').all() as Array<{ storage_name: string }>;
-    for (const s of stored) expect(existsSync(join(h.cfg.privateDir, 'gallery', s.storage_name))).toBe(true);
+    const stored = (await h.db.all('SELECT storage_name FROM gallery_photo', [])) as Array<{ storage_name: string }>;
+    for (const s of stored) expect(existsSync(join(h.privateDir, s.storage_name))).toBe(true);
   });
 
   it('refuses a disguised file and stores nothing', async () => {
-    const before = readdirSync(join(h.cfg.privateDir, 'gallery')).length;
+    const before = readdirSync(join(h.privateDir, 'gallery')).length;
     const r = await upload(h, cookie, csrf, [{ name: 'x.jpg', data: Buffer.from('MZ\x90\0'), type: 'image/jpeg' }]);
     expect(r.headers.get('location')).toContain('err=');
-    expect(readdirSync(join(h.cfg.privateDir, 'gallery')).length).toBe(before);
+    expect(readdirSync(join(h.privateDir, 'gallery')).length).toBe(before);
     const r2 = await upload(h, cookie, csrf, [{ name: 'a.pdf', data: pdf(), type: 'application/pdf' }]);
     expect(r2.headers.get('location')).toContain('err=');
   });
@@ -133,9 +133,9 @@ describe('gallery: nothing is public without owner approval', () => {
   });
 
   it('does not show private media to the public even by direct URL', async () => {
-    const second = (h.db.prepare("SELECT id FROM gallery_photo WHERE id <> 1").get() as { id: number }).id;
+    const second = ((await h.db.first("SELECT id FROM gallery_photo WHERE id <> 1", [])) as { id: number }).id;
     expect((await fetch(`${h.base}/api/gallery/media/${second}`)).status).toBe(404);
-    const storage = (h.db.prepare('SELECT storage_name FROM gallery_photo WHERE id = ?').get(second) as { storage_name: string }).storage_name;
+    const storage = ((await h.db.first('SELECT storage_name FROM gallery_photo WHERE id = ?', [second])) as { storage_name: string }).storage_name;
     expect((await fetch(`${h.base}/${storage}`)).status).toBe(404);
     expect((await fetch(`${h.base}/api/gallery/media/..%2Fsecret`)).status).toBe(404);
   });
@@ -169,10 +169,10 @@ describe('gallery: pairs publish as units', () => {
     await h.close();
   });
 
-  const project = () => (h.db.prepare('SELECT id FROM gallery_project').get() as { id: number }).id;
+  const project = async () => ((await h.db.first('SELECT id FROM gallery_project', [])) as { id: number }).id;
 
   it('shows a Before without its After as nothing, and refuses an incompatible pair', async () => {
-    await post(h, cookie, csrf, '/admin/gallery/photos/1', approved({ kind: 'before', projectId: String(project()), serviceId: 'deep-cleaning', captionEn: 'Before', captionEs: 'Antes', altEn: 'Before', altEs: 'Antes' }));
+    await post(h, cookie, csrf, '/admin/gallery/photos/1', approved({ kind: 'before', projectId: String(await project()), serviceId: 'deep-cleaning', captionEn: 'Before', captionEs: 'Antes', altEn: 'Before', altEs: 'Antes' }));
     expect((await publicApi(h)).items).toEqual([]);
     const bad = await post(h, cookie, csrf, '/admin/gallery/pairs', { before: '2', after: '2' });
     expect(bad.headers.get('location')).toContain('err=');
@@ -181,7 +181,7 @@ describe('gallery: pairs publish as units', () => {
   });
 
   it('publishes a Before/After pair together once both are approved', async () => {
-    await post(h, cookie, csrf, '/admin/gallery/photos/2', approved({ kind: 'after', projectId: String(project()), serviceId: 'deep-cleaning', captionEn: 'After', captionEs: 'Después', altEn: 'After', altEs: 'Después' }));
+    await post(h, cookie, csrf, '/admin/gallery/photos/2', approved({ kind: 'after', projectId: String(await project()), serviceId: 'deep-cleaning', captionEn: 'After', captionEs: 'Después', altEn: 'After', altEs: 'Después' }));
     const created = await post(h, cookie, csrf, '/admin/gallery/pairs', { before: '1', after: '2' });
     expect(created.headers.get('location')).toContain('ok=saved');
     const api = await publicApi(h);
@@ -191,22 +191,22 @@ describe('gallery: pairs publish as units', () => {
   });
 
   it('hides the whole pair when one photo is hidden, and never shows the other alone', async () => {
-    await post(h, cookie, csrf, '/admin/gallery/photos/2', approved({ kind: 'after', projectId: String(project()), serviceId: 'deep-cleaning', captionEn: 'After', captionEs: 'Después', altEn: 'After', altEs: 'Después', visible: '' }));
+    await post(h, cookie, csrf, '/admin/gallery/photos/2', approved({ kind: 'after', projectId: String(await project()), serviceId: 'deep-cleaning', captionEn: 'After', captionEs: 'Después', altEn: 'After', altEs: 'Después', visible: '' }));
     expect((await publicApi(h)).items).toEqual([]);
   });
 
   it('removing a photo breaks its pair and keeps it out of the site', async () => {
-    await post(h, cookie, csrf, '/admin/gallery/photos/2', approved({ kind: 'after', projectId: String(project()), serviceId: 'deep-cleaning', captionEn: 'After', captionEs: 'Después', altEn: 'After', altEs: 'Después' }));
+    await post(h, cookie, csrf, '/admin/gallery/photos/2', approved({ kind: 'after', projectId: String(await project()), serviceId: 'deep-cleaning', captionEn: 'After', captionEs: 'Después', altEn: 'After', altEs: 'Después' }));
     await post(h, cookie, csrf, '/admin/gallery/pairs', { before: '1', after: '2' });
     expect((await publicApi(h)).items.length).toBe(1);
     await post(h, cookie, csrf, '/admin/gallery/photos/2/delete', {});
     expect((await publicApi(h)).items).toEqual([]);
-    expect(count(h, 'SELECT COUNT(*) AS n FROM gallery_pair')).toBe(0);
+    expect(await count(h, 'SELECT COUNT(*) AS n FROM gallery_pair')).toBe(0);
   });
 
   it('unpairing removes the pair without deleting the photos', async () => {
-    const pairCount = count(h, 'SELECT COUNT(*) AS n FROM gallery_pair');
+    const pairCount = await count(h, 'SELECT COUNT(*) AS n FROM gallery_pair');
     expect(pairCount).toBe(0);
-    expect(count(h, 'SELECT COUNT(*) AS n FROM gallery_photo WHERE deleted_at IS NULL')).toBe(2);
+    expect(await count(h, 'SELECT COUNT(*) AS n FROM gallery_photo WHERE deleted_at IS NULL')).toBe(2);
   });
 });

@@ -3,11 +3,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import type { Server } from 'node:http';
+import { createApp } from '../src/app.js';
 import { loadConfig, type Config } from '../src/config.js';
-import { startServer } from '../src/server.js';
 import { createAdmin } from '../src/auth.js';
+import { migrate, type Db } from '../src/db.js';
+import type { FileStore } from '../src/files.js';
+import { listen } from '../src/node/http.js';
+import { localFiles } from '../src/node/local-files.js';
+import { localStatic } from '../src/node/static.js';
+import { sqliteDb } from '../src/node/sqlite-db.js';
 import { totpCode } from '../src/security.js';
-import type { Db } from '../src/db.js';
 
 export const PASSWORD = 'correct horse battery staple';
 export const USERNAME = 'owner';
@@ -16,32 +21,28 @@ export interface Harness {
   base: string;
   cfg: Config;
   db: Db;
+  files: FileStore;
   server: Server;
   root: string;
+  privateDir: string;
+  publicDir: string;
   totpSecret: string;
   close: () => Promise<void>;
 }
 
-/** Starts a real HTTP server with a temporary database, private folder, and public site. */
+/** Starts a real HTTP server (the same app as production, through the local Node adapter). */
 export async function startHarness(over: Partial<Config> = {}, opts: { admin?: boolean } = {}): Promise<Harness> {
   const root = mkdtempSync(join(tmpdir(), 'bridiant-test-'));
   const publicDir = join(root, 'public');
   mkdirSync(publicDir, { recursive: true });
   writeFileSync(join(publicDir, 'index.html'), '<!doctype html><title>Home</title><p>Public home</p>');
   writeFileSync(join(publicDir, '404.html'), '<!doctype html><p>Not found page</p>');
-  const cfg = loadConfig(
-    { BRIDIANT_ENV: 'development' },
-    {
-      dataDir: root,
-      dbPath: join(root, 'test.sqlite'),
-      privateDir: join(root, 'private'),
-      publicDir,
-      secretKey: randomBytes(32),
-      ipSalt: 'test-salt-for-integration-tests',
-      ...over,
-    },
-  );
-  const { server, db } = await startServer(cfg, 0, '127.0.0.1');
+  const base = loadConfig({ BRIDIANT_ENV: 'development' }, { secretKey: randomBytes(32) });
+  const cfg: Config = { ...base, ipSalt: 'test-salt-for-integration-tests', ...over };
+  const db = sqliteDb(join(root, 'test.sqlite'));
+  await migrate(db);
+  const files = localFiles(join(root, 'private'));
+  const server = await listen(createApp({ cfg, db, files, assets: localStatic(publicDir) }), 0, '127.0.0.1');
   const address = server.address();
   const port = typeof address === 'object' && address ? address.port : 0;
   let totpSecret = '';
@@ -53,8 +54,11 @@ export async function startHarness(over: Partial<Config> = {}, opts: { admin?: b
     base: `http://127.0.0.1:${port}`,
     cfg,
     db,
+    files,
     server,
     root,
+    privateDir: join(root, 'private'),
+    publicDir,
     totpSecret,
     close: async () => {
       await new Promise<void>((r) => server.close(() => r()));
@@ -64,7 +68,7 @@ export async function startHarness(over: Partial<Config> = {}, opts: { admin?: b
   };
 }
 
-export function currentCode(secret: string): string {
+export async function currentCode(secret: string): Promise<string> {
   return totpCode(secret, Date.now());
 }
 
@@ -73,7 +77,7 @@ export async function signIn(h: Harness, overrides: { password?: string; code?: 
   const body = new URLSearchParams({
     username: overrides.username ?? USERNAME,
     password: overrides.password ?? PASSWORD,
-    code: overrides.code ?? currentCode(h.totpSecret),
+    code: overrides.code ?? (await currentCode(h.totpSecret)),
   });
   const response = await fetch(`${h.base}/admin/login`, { method: 'POST', body, redirect: 'manual' });
   const setCookie = response.headers.get('set-cookie') ?? '';

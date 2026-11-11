@@ -45,7 +45,7 @@ form.inline { margin: 0; }
 .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
 .row > * { flex: 1 1 160px; }
 .head-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
-.hero-card { display: grid; gap: 6px; }
+.hero-card { display: grid; gap: 6px; grid-template-columns: minmax(0, 1fr); }
 .back { text-decoration: none; font-size: 0.95rem; color: var(--color-navy-70); padding: 6px 0; display: inline-flex; min-height: 40px; align-items: center; }
 
 .summary { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }

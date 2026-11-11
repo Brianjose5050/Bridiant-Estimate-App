@@ -55,7 +55,7 @@ describe('metadata removal', () => {
   it('removes EXIF, GPS, and comments from a JPEG and keeps the image structure', () => {
     const input = jpegWithMetadata();
     expect(input.toString('latin1')).toContain('GPSLatitude');
-    const output = stripMetadata(input, 'image/jpeg');
+    const output = Buffer.from(stripMetadata(input, 'image/jpeg'));
     const text = output.toString('latin1');
     expect(text).not.toContain('GPS');
     expect(text).not.toContain('CameraModel');
@@ -69,7 +69,7 @@ describe('metadata removal', () => {
   });
 
   it('removes text and EXIF chunks from a PNG and keeps the image data', () => {
-    const output = stripMetadata(pngWithMetadata(), 'image/png');
+    const output = Buffer.from(stripMetadata(pngWithMetadata(), 'image/png'));
     const text = output.toString('latin1');
     expect(text).not.toContain('GPS');
     expect(text).not.toContain('tEXt');
@@ -80,7 +80,7 @@ describe('metadata removal', () => {
   });
 
   it('removes EXIF and XMP chunks from a WebP and fixes the file size', () => {
-    const output = stripMetadata(webpWithMetadata(), 'image/webp');
+    const output = Buffer.from(stripMetadata(webpWithMetadata(), 'image/webp'));
     const text = output.toString('latin1');
     expect(text).not.toContain('GPS');
     expect(text).not.toContain('EXIF');

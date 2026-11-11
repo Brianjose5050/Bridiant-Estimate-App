@@ -1,53 +1,108 @@
-import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
-import { promisify } from 'node:util';
+/**
+ * Security primitives on Web Crypto. Runs unchanged in Cloudflare Workers and in Node 22.
+ * No Node-only APIs: no Buffer, no node:crypto.
+ */
 
-const scrypt = promisify(scryptCb) as (password: string, salt: Buffer, keylen: number, options: { N: number; r: number; p: number }) => Promise<Buffer>;
+export const PBKDF2_ITERATIONS = 100_000; // Workers' WebCrypto limit for PBKDF2.
 
-const SCRYPT = { N: 16384, r: 8, p: 1, keylen: 64 } as const;
+const enc = new TextEncoder();
+const dec = new TextDecoder();
 
-/** Password hash: scrypt with a random salt. Format: scrypt$N$r$p$salt$hash (base64url). */
+export function toBytes(input: string | Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> {
+  return typeof input === 'string' ? enc.encode(input) : input;
+}
+
+export function bytesToBase64Url(bytes: Uint8Array<ArrayBuffer>): string {
+  let binary = '';
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+export function base64UrlToBytes(text: string): Uint8Array<ArrayBuffer> {
+  const padded = text.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (text.length % 4)) % 4);
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (c) => c.charCodeAt(0));
+}
+
+export function base64ToBytes(text: string): Uint8Array<ArrayBuffer> {
+  const binary = atob(text.trim());
+  return Uint8Array.from(binary, (c) => c.charCodeAt(0));
+}
+
+export function randomBytes(length: number): Uint8Array<ArrayBuffer> {
+  const out = new Uint8Array(length);
+  crypto.getRandomValues(out);
+  return out;
+}
+
+export function randomToken(length = 32): string {
+  return bytesToBase64Url(randomBytes(length));
+}
+
+/** Constant-time comparison of two byte arrays or strings. */
+export function constantTimeEqual(a: string | Uint8Array<ArrayBuffer>, b: string | Uint8Array<ArrayBuffer>): boolean {
+  const x = toBytes(a);
+  const y = toBytes(b);
+  if (x.length !== y.length) return false;
+  let diff = 0;
+  for (let i = 0; i < x.length; i += 1) diff |= (x[i] ?? 0) ^ (y[i] ?? 0);
+  return diff === 0;
+}
+
+export async function sha256(input: string | Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
+  return new Uint8Array(await crypto.subtle.digest('SHA-256', toBytes(input)));
+}
+
+export function toHex(bytes: Uint8Array<ArrayBuffer>): string {
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+export async function sha256Hex(input: string | Uint8Array<ArrayBuffer>): Promise<string> {
+  return toHex(await sha256(input));
+}
+
+async function hmacKey(key: Uint8Array<ArrayBuffer>, hash: 'SHA-1' | 'SHA-256'): Promise<CryptoKey> {
+  return crypto.subtle.importKey('raw', key, { name: 'HMAC', hash }, false, ['sign']);
+}
+
+/** Salted, non-reversible IP fingerprint for rate limits and audit. Raw IPs are never stored. */
+export async function hashIp(ip: string, salt: string): Promise<string> {
+  const key = await hmacKey(toBytes(salt), 'SHA-256');
+  const mac = new Uint8Array(await crypto.subtle.sign('HMAC', key, toBytes(ip)));
+  return toHex(mac).slice(0, 32);
+}
+
+// ---------- Passwords (PBKDF2-SHA256) ----------
+
+async function pbkdf2(password: string, salt: Uint8Array<ArrayBuffer>, iterations: number): Promise<Uint8Array<ArrayBuffer>> {
+  const base = await crypto.subtle.importKey('raw', toBytes(password), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations, hash: 'SHA-256' }, base, 256);
+  return new Uint8Array(bits);
+}
+
+/** Format: pbkdf2-sha256$iterations$salt$hash (base64url). */
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16);
-  const hash = await scrypt(password, salt, SCRYPT.keylen, { N: SCRYPT.N, r: SCRYPT.r, p: SCRYPT.p });
-  return ['scrypt', SCRYPT.N, SCRYPT.r, SCRYPT.p, salt.toString('base64url'), hash.toString('base64url')].join('$');
+  const hash = await pbkdf2(password, salt, PBKDF2_ITERATIONS);
+  return ['pbkdf2-sha256', PBKDF2_ITERATIONS, bytesToBase64Url(salt), bytesToBase64Url(hash)].join('$');
 }
 
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
   const parts = stored.split('$');
-  if (parts.length !== 6 || parts[0] !== 'scrypt') return false;
-  const N = Number(parts[1]);
-  const r = Number(parts[2]);
-  const p = Number(parts[3]);
-  const salt = Buffer.from(parts[4] ?? '', 'base64url');
-  const expected = Buffer.from(parts[5] ?? '', 'base64url');
-  const actual = await scrypt(password, salt, expected.length, { N, r, p });
-  return actual.length === expected.length && timingSafeEqual(actual, expected);
+  if (parts.length !== 4 || parts[0] !== 'pbkdf2-sha256') return false;
+  const iterations = Number(parts[1]);
+  if (!Number.isInteger(iterations) || iterations < 1000 || iterations > 1_000_000) return false;
+  const salt = base64UrlToBytes(parts[2] ?? '');
+  const expected = base64UrlToBytes(parts[3] ?? '');
+  const actual = await pbkdf2(password, salt, iterations);
+  return constantTimeEqual(actual, expected);
 }
 
-export function constantTimeEqual(a: string, b: string): boolean {
-  const ab = Buffer.from(a);
-  const bb = Buffer.from(b);
-  return ab.length === bb.length && timingSafeEqual(ab, bb);
-}
-
-export function randomToken(bytes = 32): string {
-  return randomBytes(bytes).toString('base64url');
-}
-
-export function sha256Hex(input: string | Buffer): string {
-  return createHash('sha256').update(input).digest('hex');
-}
-
-/** Salted, non-reversible IP fingerprint for rate limits and audit (raw IPs are not stored). */
-export function hashIp(ip: string, salt: string): string {
-  return createHmac('sha256', salt).update(ip).digest('hex').slice(0, 32);
-}
-
-// ---------- Base32 and TOTP (RFC 6238, HMAC-SHA1, 30 seconds, 6 digits) ----------
+// ---------- Base32 and TOTP (RFC 6238, HMAC-SHA1, 30 s, 6 digits) ----------
 
 const B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
-export function base32Encode(buf: Buffer): string {
+export function base32Encode(buf: Uint8Array<ArrayBuffer>): string {
   let bits = 0;
   let value = 0;
   let out = '';
@@ -63,7 +118,7 @@ export function base32Encode(buf: Buffer): string {
   return out;
 }
 
-export function base32Decode(text: string): Buffer {
+export function base32Decode(text: string): Uint8Array<ArrayBuffer> {
   const clean = text.replace(/=+$/, '').toUpperCase();
   let bits = 0;
   let value = 0;
@@ -78,18 +133,19 @@ export function base32Decode(text: string): Buffer {
       bits -= 8;
     }
   }
-  return Buffer.from(out);
+  return Uint8Array.from(out);
 }
 
 export function generateTotpSecret(): string {
   return base32Encode(randomBytes(20));
 }
 
-export function totpCode(secret: string, atMs: number, step = 30, digits = 6): string {
+export async function totpCode(secret: string, atMs: number, step = 30, digits = 6): Promise<string> {
   const counter = Math.floor(atMs / 1000 / step);
-  const msg = Buffer.alloc(8);
-  msg.writeBigUInt64BE(BigInt(counter));
-  const hmac = createHmac('sha1', base32Decode(secret)).update(msg).digest();
+  const msg = new Uint8Array(8);
+  new DataView(msg.buffer).setBigUint64(0, BigInt(counter));
+  const key = await hmacKey(base32Decode(secret), 'SHA-1');
+  const hmac = new Uint8Array(await crypto.subtle.sign('HMAC', key, msg));
   const offset = (hmac[hmac.length - 1] ?? 0) & 0x0f;
   const binary =
     ((hmac[offset] ?? 0) & 0x7f) * 0x1000000 +
@@ -99,12 +155,12 @@ export function totpCode(secret: string, atMs: number, step = 30, digits = 6): s
   return String(binary % 10 ** digits).padStart(digits, '0');
 }
 
-/** Accepts the current code and one step either side (clock drift). */
-export function verifyTotp(secret: string, code: string, atMs = Date.now()): boolean {
+/** Accepts the current code and one 30-second step either side (clock drift). */
+export async function verifyTotp(secret: string, code: string, atMs = Date.now()): Promise<boolean> {
   if (!/^\d{6}$/.test(code)) return false;
   let ok = false;
   for (const drift of [-1, 0, 1]) {
-    if (constantTimeEqual(totpCode(secret, atMs + drift * 30_000), code)) ok = true;
+    if (constantTimeEqual(await totpCode(secret, atMs + drift * 30_000), code)) ok = true;
   }
   return ok;
 }
@@ -116,35 +172,58 @@ export function otpauthUri(secret: string, account: string, issuer: string): str
 
 // ---------- Encryption at rest (AES-256-GCM) ----------
 
-export function encryptSecret(key: Buffer, plaintext: string): string {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', key, iv);
-  const ct = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return ['v1', iv.toString('base64url'), tag.toString('base64url'), ct.toString('base64url')].join('.');
+async function aesKey(key: Uint8Array<ArrayBuffer>, usage: 'encrypt' | 'decrypt'): Promise<CryptoKey> {
+  if (key.length !== 32) throw new Error('Key must be 32 bytes.');
+  return crypto.subtle.importKey('raw', key, { name: 'AES-GCM' }, false, [usage]);
 }
 
-export function decryptSecret(key: Buffer, payload: string): string {
-  const [version, ivB, tagB, ctB] = payload.split('.');
-  if (version !== 'v1' || !ivB || !tagB || !ctB) throw new Error('Unsupported ciphertext');
-  const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(ivB, 'base64url'));
-  decipher.setAuthTag(Buffer.from(tagB, 'base64url'));
-  return Buffer.concat([decipher.update(Buffer.from(ctB, 'base64url')), decipher.final()]).toString('utf8');
+export async function encryptSecret(key: Uint8Array<ArrayBuffer>, plaintext: string): Promise<string> {
+  const iv = randomBytes(12);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await aesKey(key, 'encrypt'), toBytes(plaintext)));
+  return ['v1', bytesToBase64Url(iv), bytesToBase64Url(ct)].join('.');
+}
+
+export async function decryptSecret(key: Uint8Array<ArrayBuffer>, payload: string): Promise<string> {
+  const [version, ivB, ctB] = payload.split('.');
+  if (version !== 'v1' || !ivB || !ctB) throw new Error('Unsupported ciphertext');
+  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: base64UrlToBytes(ivB) }, await aesKey(key, 'decrypt'), base64UrlToBytes(ctB));
+  return dec.decode(plain);
+}
+
+/** Encrypts bytes (used for backups and private file envelopes). Output: iv(12) || ciphertext+tag. */
+export async function encryptBytes(key: Uint8Array<ArrayBuffer>, data: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
+  const iv = randomBytes(12);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await aesKey(key, 'encrypt'), data));
+  const out = new Uint8Array(12 + ct.length);
+  out.set(iv, 0);
+  out.set(ct, 12);
+  return out;
+}
+
+export async function decryptBytes(key: Uint8Array<ArrayBuffer>, blob: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
+  const iv = blob.subarray(0, 12);
+  const ct = blob.subarray(12);
+  return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, await aesKey(key, 'decrypt'), ct));
 }
 
 // ---------- File type detection from content, never from the file name ----------
 
 export type DetectedType = 'image/jpeg' | 'image/png' | 'image/webp' | 'image/heic' | 'application/pdf';
 
-export function detectFileType(buf: Buffer): DetectedType | null {
+function startsWithAscii(bytes: Uint8Array<ArrayBuffer>, text: string, offset = 0): boolean {
+  for (let i = 0; i < text.length; i += 1) if (bytes[offset + i] !== text.charCodeAt(i)) return false;
+  return true;
+}
+
+export function detectFileType(buf: Uint8Array<ArrayBuffer>): DetectedType | null {
   if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
-  if (buf.length >= 8 && buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
-  if (buf.length >= 12 && buf.subarray(0, 4).toString('latin1') === 'RIFF' && buf.subarray(8, 12).toString('latin1') === 'WEBP') return 'image/webp';
-  if (buf.length >= 12 && buf.subarray(4, 8).toString('latin1') === 'ftyp') {
-    const brand = buf.subarray(8, 12).toString('latin1');
+  if (buf.length >= 8 && [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((b, i) => buf[i] === b)) return 'image/png';
+  if (buf.length >= 12 && startsWithAscii(buf, 'RIFF') && startsWithAscii(buf, 'WEBP', 8)) return 'image/webp';
+  if (buf.length >= 12 && startsWithAscii(buf, 'ftyp', 4)) {
+    const brand = dec.decode(buf.subarray(8, 12));
     if (['heic', 'heix', 'mif1', 'msf1', 'heim', 'heis'].includes(brand)) return 'image/heic';
   }
-  if (buf.length >= 5 && buf.subarray(0, 5).toString('latin1') === '%PDF-') return 'application/pdf';
+  if (buf.length >= 5 && startsWithAscii(buf, '%PDF-')) return 'application/pdf';
   return null;
 }
 

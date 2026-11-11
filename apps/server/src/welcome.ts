@@ -1,8 +1,7 @@
-import { mkdir, unlink, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import type { Config } from './config.js';
-import type { Db } from './db.js';
-import { audit, nowIso } from './db.js';
+import type { Db, Stmt } from './db.js';
+import { audit, auditStmt, nowIso } from './db.js';
+import type { FileStore } from './files.js';
 import { detectFileType, randomToken, sha256Hex } from './security.js';
 
 export const WELCOME_KINDS = ['presentation', 'service_info', 'standards', 'preparation', 'policy', 'document', 'faq'] as const;
@@ -75,94 +74,81 @@ export function parseResourceInput(body: Record<string, unknown>): { ok: true; v
   };
 }
 
-export function createResource(db: Db, input: ResourceInput, chapterKey: string | null = null): number {
+export async function createResource(db: Db, input: ResourceInput, chapterKey: string | null = null): Promise<number> {
   const now = nowIso();
-  const info = db
-    .prepare(
-      'INSERT INTO welcome_resource (chapter_key, kind, access_tier, title_en, title_es, subtitle_en, subtitle_es, body_en, body_es, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    )
-    .run(chapterKey, input.kind, input.accessTier, input.titleEn, input.titleEs, input.subtitleEn, input.subtitleEs, input.bodyEn, input.bodyEs, input.sortOrder, now, now);
-  const id = Number(info.lastInsertRowid);
-  audit(db, 'resource_created', 'welcome_resource', String(id));
-  return id;
+  const info = await db.run(
+    'INSERT INTO welcome_resource (chapter_key, kind, access_tier, title_en, title_es, subtitle_en, subtitle_es, body_en, body_es, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [chapterKey, input.kind, input.accessTier, input.titleEn, input.titleEs, input.subtitleEn, input.subtitleEs, input.bodyEn, input.bodyEs, input.sortOrder, now, now],
+  );
+  await audit(db, 'resource_created', 'welcome_resource', String(info.lastRowId));
+  return info.lastRowId;
+}
+
+export async function getResource(db: Db, id: number): Promise<ResourceRow | null> {
+  return db.first<ResourceRow>('SELECT * FROM welcome_resource WHERE id = ?', [id]);
+}
+
+export function listResources(db: Db): Promise<ResourceRow[]> {
+  return db.all<ResourceRow>('SELECT * FROM welcome_resource ORDER BY sort_order, id');
 }
 
 /**
- * Updates text. Changing a language's title, subtitle, or body resets that language's approval,
- * because replacing approved content needs a new approval.
+ * Updates text. Changing a language's title, subtitle, or body resets that language's approval.
+ * Replacing approved content needs a new approval.
  */
-export function updateResource(db: Db, id: number, input: ResourceInput): void {
-  const current = getResource(db, id);
+export async function updateResource(db: Db, id: number, input: ResourceInput): Promise<void> {
+  const current = await getResource(db, id);
   if (!current) throw new Error('not_found');
   const enChanged = current.title_en !== input.titleEn || current.subtitle_en !== input.subtitleEn || current.body_en !== input.bodyEn;
   const esChanged = current.title_es !== input.titleEs || current.subtitle_es !== input.subtitleEs || current.body_es !== input.bodyEs;
-  db.prepare(`
-    UPDATE welcome_resource SET kind = ?, access_tier = ?, title_en = ?, title_es = ?, subtitle_en = ?, subtitle_es = ?,
-      body_en = ?, body_es = ?, sort_order = ?,
-      approved_en = CASE WHEN ? THEN 0 ELSE approved_en END,
-      approved_es = CASE WHEN ? THEN 0 ELSE approved_es END,
-      updated_at = ?
-    WHERE id = ?
-  `).run(
-    input.kind,
-    input.accessTier,
-    input.titleEn,
-    input.titleEs,
-    input.subtitleEn,
-    input.subtitleEs,
-    input.bodyEn,
-    input.bodyEs,
-    input.sortOrder,
-    enChanged ? 1 : 0,
-    esChanged ? 1 : 0,
-    nowIso(),
-    id,
-  );
-  audit(db, 'resource_updated', 'welcome_resource', String(id), { enChanged, esChanged });
+  await db.batch([
+    {
+      sql: `UPDATE welcome_resource SET kind = ?, access_tier = ?, title_en = ?, title_es = ?, subtitle_en = ?, subtitle_es = ?,
+              body_en = ?, body_es = ?, sort_order = ?,
+              approved_en = CASE WHEN ? THEN 0 ELSE approved_en END,
+              approved_es = CASE WHEN ? THEN 0 ELSE approved_es END,
+              updated_at = ?
+            WHERE id = ?`,
+      params: [input.kind, input.accessTier, input.titleEn, input.titleEs, input.subtitleEn, input.subtitleEs, input.bodyEn, input.bodyEs, input.sortOrder, enChanged ? 1 : 0, esChanged ? 1 : 0, nowIso(), id],
+    },
+    auditStmt('resource_updated', 'welcome_resource', String(id), { enChanged, esChanged }),
+  ]);
 }
 
-export function getResource(db: Db, id: number): ResourceRow | undefined {
-  return db.prepare('SELECT * FROM welcome_resource WHERE id = ?').get(id) as ResourceRow | undefined;
-}
-
-export function listResources(db: Db): ResourceRow[] {
-  return db.prepare('SELECT * FROM welcome_resource ORDER BY sort_order, id').all() as unknown as ResourceRow[];
-}
-
-/** The owner approves each language separately. Approval is an explicit action. */
-export function setApproval(db: Db, id: number, lang: Lang, approved: boolean): void {
+export async function setApproval(db: Db, id: number, lang: Lang, approved: boolean): Promise<void> {
   const column = lang === 'en' ? 'approved_en' : 'approved_es';
-  db.prepare(`UPDATE welcome_resource SET ${column} = ?, updated_at = ? WHERE id = ?`).run(approved ? 1 : 0, nowIso(), id);
-  audit(db, approved ? 'resource_approved' : 'resource_unapproved', 'welcome_resource', String(id), { lang });
+  await db.batch([
+    { sql: `UPDATE welcome_resource SET ${column} = ?, updated_at = ? WHERE id = ?`, params: [approved ? 1 : 0, nowIso(), id] },
+    auditStmt(approved ? 'resource_approved' : 'resource_unapproved', 'welcome_resource', String(id), { lang }),
+  ]);
 }
 
-export function setPublished(db: Db, id: number, published: boolean): void {
-  db.prepare('UPDATE welcome_resource SET published = ?, updated_at = ? WHERE id = ?').run(published ? 1 : 0, nowIso(), id);
-  audit(db, published ? 'resource_published' : 'resource_unpublished', 'welcome_resource', String(id));
+export async function setPublished(db: Db, id: number, published: boolean): Promise<void> {
+  await db.batch([
+    { sql: 'UPDATE welcome_resource SET published = ?, updated_at = ? WHERE id = ?', params: [published ? 1 : 0, nowIso(), id] },
+    auditStmt(published ? 'resource_published' : 'resource_unpublished', 'welcome_resource', String(id)),
+  ]);
+}
+
+export interface PacketChapter {
+  key: string;
+  sortOrder: number;
+  kind: WelcomeKind;
+  accessTier: AccessTier;
+  title: { en: string; es: string };
+  subtitle: { en: string; es: string };
+  body: { en: string; es: string };
 }
 
 /** Adds packet chapters that do not exist yet. Existing chapters are never overwritten. */
-export function seedWelcomePacket(
-  db: Db,
-  packet: { chapters: Array<{ key: string; sortOrder: number; kind: WelcomeKind; accessTier: AccessTier; title: { en: string; es: string }; subtitle: { en: string; es: string }; body: { en: string; es: string } }> },
-): number {
+export async function seedWelcomePacket(db: Db, packet: { chapters: PacketChapter[] }): Promise<number> {
   let added = 0;
   for (const c of packet.chapters) {
-    const exists = db.prepare('SELECT id FROM welcome_resource WHERE chapter_key = ?').get(c.key);
+    const exists = await db.first('SELECT id FROM welcome_resource WHERE chapter_key = ?', [c.key]);
     if (exists) continue;
-    createResource(
+    await createResource(
       db,
-      {
-        kind: c.kind,
-        accessTier: c.accessTier,
-        titleEn: c.title.en,
-        titleEs: c.title.es,
-        subtitleEn: c.subtitle.en,
-        subtitleEs: c.subtitle.es,
-        bodyEn: c.body.en,
-        bodyEs: c.body.es,
-        sortOrder: c.sortOrder,
-      },
+      { kind: c.kind, accessTier: c.accessTier, titleEn: c.title.en, titleEs: c.title.es, subtitleEn: c.subtitle.en, subtitleEs: c.subtitle.es, bodyEn: c.body.en, bodyEs: c.body.es, sortOrder: c.sortOrder },
       c.key,
     );
     added += 1;
@@ -170,30 +156,25 @@ export function seedWelcomePacket(
   return added;
 }
 
-/**
- * Stores a PDF for a resource. Files go to the private directory and are served only through
- * the public document route when the resource is published, public, and approved in that language.
- */
-export async function attachDocument(db: Db, cfg: Config, id: number, buffer: Buffer): Promise<void> {
-  if (!getResource(db, id)) throw new Error('not_found');
-  if (buffer.length === 0) throw new Error('empty_file');
-  if (buffer.length > cfg.maxDocumentBytes) throw new Error('file_too_large');
-  const type = detectFileType(buffer);
-  if (type !== 'application/pdf') throw new Error('unsupported_file');
-  await mkdir(join(cfg.privateDir, 'documents'), { recursive: true });
-  const storage = `documents/${randomToken(18)}.pdf`;
-  await writeFile(join(cfg.privateDir, storage), buffer, { mode: 0o600, flag: 'wx' });
-  const previous = getResource(db, id)?.document_storage;
-  db.prepare('UPDATE welcome_resource SET document_storage = ?, document_mime = ?, document_bytes = ?, document_sha256 = ?, updated_at = ? WHERE id = ?').run(
-    storage,
-    'application/pdf',
-    buffer.length,
-    sha256Hex(buffer),
-    nowIso(),
-    id,
-  );
-  if (previous) await unlink(join(cfg.privateDir, previous)).catch(() => undefined);
-  audit(db, 'document_uploaded', 'welcome_resource', String(id), { bytes: buffer.length });
+/** Stores a PDF privately. It is served only when the resource is published, public, and approved in that language. */
+export async function attachDocument(db: Db, cfg: Config, files: FileStore, id: number, data: Uint8Array<ArrayBuffer>): Promise<void> {
+  const current = await getResource(db, id);
+  if (!current) throw new Error('not_found');
+  if (data.length === 0) throw new Error('empty_file');
+  if (data.length > cfg.maxDocumentBytes) throw new Error('file_too_large');
+  if (detectFileType(data) !== 'application/pdf') throw new Error('unsupported_file');
+  const key = `documents/${randomToken(18)}.pdf`;
+  await files.put(key, data, 'application/pdf');
+  const hash = await sha256Hex(data);
+  const statements: Stmt[] = [
+    {
+      sql: 'UPDATE welcome_resource SET document_storage = ?, document_mime = ?, document_bytes = ?, document_sha256 = ?, updated_at = ? WHERE id = ?',
+      params: [key, 'application/pdf', data.length, hash, nowIso(), id],
+    },
+    auditStmt('document_uploaded', 'welcome_resource', String(id), { bytes: data.length }),
+  ];
+  await db.batch(statements);
+  if (current.document_storage) await files.delete(current.document_storage).catch(() => undefined);
 }
 
 export interface PublicResource {
@@ -206,15 +187,10 @@ export interface PublicResource {
   documentUrl: string | null;
 }
 
-/**
- * Public list. Only items that are published, public, and approved in this language are returned.
- * Drafts, unpublished items, and other access tiers never leave the server.
- */
-export function publicResources(db: Db, lang: Lang): PublicResource[] {
+/** Public list: published, public tier, approved in this language. Nothing else leaves the server. */
+export async function publicResources(db: Db, lang: Lang): Promise<PublicResource[]> {
   const approved = lang === 'en' ? 'approved_en' : 'approved_es';
-  const rows = db
-    .prepare(`SELECT * FROM welcome_resource WHERE published = 1 AND access_tier = 'public' AND ${approved} = 1 ORDER BY sort_order, id`)
-    .all() as unknown as ResourceRow[];
+  const rows = await db.all<ResourceRow>(`SELECT * FROM welcome_resource WHERE published = 1 AND access_tier = 'public' AND ${approved} = 1 ORDER BY sort_order, id`);
   return rows.map((row) => ({
     id: row.id,
     key: row.chapter_key,
@@ -226,12 +202,14 @@ export function publicResources(db: Db, lang: Lang): PublicResource[] {
   }));
 }
 
-/** Returns the stored PDF path only when the resource is publicly visible in this language. */
-export function publicDocumentPath(db: Db, cfg: Config, id: number, lang: Lang): string | null {
+/** The stored PDF key, only when the resource is publicly visible in this language. */
+export async function publicDocumentKey(db: Db, id: number, lang: Lang): Promise<string | null> {
   const approved = lang === 'en' ? 'approved_en' : 'approved_es';
-  const row = db
-    .prepare(`SELECT document_storage FROM welcome_resource WHERE id = ? AND published = 1 AND access_tier = 'public' AND ${approved} = 1`)
-    .get(id) as { document_storage: string | null } | undefined;
-  if (!row?.document_storage) return null;
-  return join(cfg.privateDir, row.document_storage);
+  const row = await db.first<{ document_storage: string | null }>(
+    `SELECT document_storage FROM welcome_resource WHERE id = ? AND published = 1 AND access_tier = 'public' AND ${approved} = 1`,
+    [id],
+  );
+  return row?.document_storage ?? null;
 }
+
+export { audit };
