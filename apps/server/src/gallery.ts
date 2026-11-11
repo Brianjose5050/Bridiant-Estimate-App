@@ -154,23 +154,37 @@ export async function publicMediaKey(db: Db, id: number): Promise<{ key: string;
 
 /** Saves uploaded photos as private, unclassified, unapproved items. Metadata is removed before storage. */
 export async function uploadPhotos(db: Db, files: FileStore, files_: Array<{ displayName: string; buffer: Uint8Array<ArrayBuffer> }>): Promise<number> {
-  let added = 0;
-  for (const file of files_) {
+  // Check and clean every file before anything is stored: one bad file leaves nothing behind.
+  const prepared = files_.map((file) => {
     const type = detectFileType(file.buffer);
     if (!type || !PHOTO_TYPES.includes(type)) throw new Error('unsupported_file');
     if (file.buffer.length === 0) throw new Error('empty_file');
-    const clean = stripMetadata(file.buffer, type);
-    const key = `gallery/${randomToken(18)}.${extensionFor(type)}`;
-    await files.put(key, clean, type);
-    const now = nowIso();
-    const max = (await db.first<{ m: number }>('SELECT COALESCE(MAX(sort_order), 0) AS m FROM gallery_photo'))?.m ?? 0;
-    await db.batch([
-      { sql: 'INSERT INTO gallery_photo (display_name, mime, bytes, sha256, storage_name, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', params: [file.displayName, type, clean.length, await sha256Hex(clean), key, max + 1, now, now] },
-    ]);
-    added += 1;
+    return { displayName: file.displayName, type, clean: stripMetadata(file.buffer, type) };
+  });
+  if (prepared.length === 0) return 0;
+
+  const max = (await db.first<{ m: number }>('SELECT COALESCE(MAX(sort_order), 0) AS m FROM gallery_photo'))?.m ?? 0;
+  const now = nowIso();
+  const written: string[] = [];
+  try {
+    const statements: Stmt[] = [];
+    for (const [index, item] of prepared.entries()) {
+      const key = `gallery/${randomToken(18)}.${extensionFor(item.type)}`;
+      await files.put(key, item.clean, item.type);
+      written.push(key);
+      statements.push({
+        sql: 'INSERT INTO gallery_photo (display_name, mime, bytes, sha256, storage_name, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        params: [item.displayName, item.type, item.clean.length, await sha256Hex(item.clean), key, max + index + 1, now, now],
+      });
+    }
+    statements.push(auditStmt('gallery_uploaded', 'gallery_photo', null, { count: prepared.length }));
+    await db.batch(statements);
+  } catch (error) {
+    // The rows were not saved, so the files written so far are removed.
+    for (const key of written) await files.delete(key).catch(() => undefined);
+    throw error;
   }
-  await audit(db, 'gallery_uploaded', 'gallery_photo', null, { count: added });
-  return added;
+  return prepared.length;
 }
 
 export interface PhotoInput {

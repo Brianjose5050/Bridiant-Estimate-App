@@ -85,6 +85,19 @@ describe('gallery: nothing is public without owner approval', () => {
     expect(r2.headers.get('location')).toContain('err=');
   });
 
+  it('a mixed upload with one bad file stores nothing, not even the good file', async () => {
+    const countRows = () => count(h, 'SELECT COUNT(*) AS n FROM gallery_photo');
+    const rowsBefore = await countRows();
+    const filesBefore = readdirSync(join(h.privateDir, 'gallery')).length;
+    const r = await upload(h, cookie, csrf, [
+      { name: 'good.jpg', data: jpeg(), type: 'image/jpeg' },
+      { name: 'bad.jpg', data: Buffer.from('MZ\x90\0 not an image'), type: 'image/jpeg' },
+    ]);
+    expect(r.headers.get('location')).toContain('err=');
+    expect(await countRows()).toBe(rowsBefore);
+    expect(readdirSync(join(h.privateDir, 'gallery')).length).toBe(filesBefore);
+  });
+
   it('refuses an upload without the session token', async () => {
     const fd = new FormData();
     fd.append('photos', new Blob([new Uint8Array(jpeg())], { type: 'image/jpeg' }), 'a.jpg');

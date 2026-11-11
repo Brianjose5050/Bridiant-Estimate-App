@@ -1,3 +1,4 @@
+import { BodyTooLarge } from './limits.js';
 import { submitEstimateRequest, SERVICE_IDS, type RequestStore, type StoredRequest, type SubmitResult } from '@bridiant/intake';
 import type { Config } from './config.js';
 import type { Db, Stmt } from './db.js';
@@ -43,7 +44,8 @@ export async function parseMultipart(request: Request, cfg: Config, fileField: s
   let form: FormData;
   try {
     form = await request.formData();
-  } catch {
+  } catch (error) {
+    if (error instanceof BodyTooLarge) throw new UploadError('total_too_large');
     throw new UploadError('malformed');
   }
   const fields: Record<string, string> = {};

@@ -39,3 +39,8 @@ apps/public/public/preview-media/
 # Local server data: database, private photos, documents, keys. Never commit.
 apps/server/data/
 apps/server/dist/
+
+# Local Workers development variables and emulator state (never commit).
+.dev.vars
+.dev.vars.*
+apps/server/.wrangler/

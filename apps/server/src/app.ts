@@ -3,6 +3,7 @@
  * APIs here. The Workers entry (worker.ts) and the local Node adapter (main.ts) both call it.
  */
 import type { AdminCtx, AdminInput, AdminResponse } from './admin/context.js';
+import { BodyTooLarge, limitBody } from './limits.js';
 import { handleAdmin } from './admin/routes.js';
 import type { Config } from './config.js';
 import type { Db } from './db.js';
@@ -105,8 +106,9 @@ export async function readAdminInput(request: Request, cfg: Config): Promise<Adm
   const input: AdminInput = { fields: {}, files: {} };
   let form: FormData;
   try {
-    form = await request.formData();
-  } catch {
+    form = await limitBody(request, limit).formData();
+  } catch (error) {
+    if (error instanceof BodyTooLarge) throw new InputTooLarge();
     return input;
   }
   const entries: Array<[string, FormDataEntryValue]> = [];
@@ -164,7 +166,7 @@ export function createApp(deps: AppDeps): Handler {
       // ----- Estimate intake (multipart). Success is reported only after the save is confirmed. -----
       if (path === '/api/estimate') {
         if (method !== 'POST') return json(cfg, 405, { status: 'method_not_allowed' });
-        const result = await handleEstimateSubmit(request, { db, files, cfg, ip: meta.ip });
+        const result = await handleEstimateSubmit(limitBody(request, cfg.maxTotalBytes + cfg.maxFormBytes), { db, files, cfg, ip: meta.ip });
         return json(cfg, result.status, result.body);
       }
 

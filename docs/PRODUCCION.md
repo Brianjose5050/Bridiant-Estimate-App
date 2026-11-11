@@ -15,6 +15,36 @@ Estado: **no desplegado, no publicado, sin cuentas creadas, sin servicios contra
 | Correo | Cola persistente, reintentos, sin duplicados, nada se envía sin proveedor | Pruebas |
 | Verificación humana | Servidor lista para Turnstile; producción exige el secreto para arrancar | Prueba de configuración |
 
+### 1.1 Verificado en el runtime de Workers (wrangler dev, sin cuentas)
+
+Se ejecutó el Worker real (`apps/server/src/worker.ts`) con `wrangler dev`, usando el emulador local de D1 y R2. No se creó ningún recurso remoto ni se desplegó nada.
+
+| Prueba | Resultado |
+|---|---|
+| Suite HTTP sobre el Worker (`apps/server/scripts/workers-smoke.mjs`) | **48/48**, código de salida 0 |
+| E2E de navegador: cliente en móvil, panel con 2FA, Welcome Center | **30/30** |
+| E2E de navegador: galería (subir, aprobar, publicar, quitar metadatos) | **9/9** |
+| Carga de fotografías | Intake y galería aceptan una foto válida de 12 MB; archivo de 16 MB rechazado (413); ejecutable con extensión .jpg rechazado (400) |
+| Carga de documentos | PDF guardado en privado; no-PDF renombrado a .pdf rechazado; PDF público solo si está publicado y aprobado en ese idioma (inline, `application/pdf`) |
+| Solicitudes | Confirmación solo tras guardar; idempotencia (misma clave, misma referencia); honeypot sin revelar el campo; estado, notas e historial; notas nunca en respuestas públicas |
+| Autenticación | Contraseña + TOTP; error genérico; cookie `HttpOnly` y `SameSite=Strict`; CSRF obligatorio (403 sin token); sesión invalidada al cerrar sesión |
+| Galería | Sin fotos públicas antes de aprobar (404 por URL directa); GPS eliminado del archivo guardado; JPEG válido |
+| Welcome Center | Capítulos no publicados ocultos; publicado solo en el idioma aprobado |
+| Límite de lectura sin `Content-Length` | Formulario chunked de 40 KB cortado con 413; formulario pequeño leído y validado |
+| Estilos del panel | `admin.css` servido como `text/css` (antes se servía como HTML y el panel no tenía estilos) |
+
+**Errores encontrados y corregidos en esta etapa:**
+1. El límite de lectura dependía de `Content-Length`. Un cuerpo enviado en trozos podía superar el límite. Ahora el límite se cuenta mientras llega el cuerpo (`src/limits.ts`), con pruebas en Node y en el Worker.
+2. La subida de varias fotos no era atómica: si el segundo archivo era inválido, el primero quedaba guardado. Ahora todos los archivos se validan y limpian antes de escribir ninguno, y las filas se insertan en un solo lote. Si falla algo después de escribir, los archivos escritos se borran. Hay prueba de regresión.
+3. El panel servía su CSS como HTML. Corregido, con prueba.
+
+**Limitaciones de esta verificación (importante):**
+- Es un emulador local (`workerd` con D1 y R2 simulados). No prueba la red, la latencia, ni los límites reales de CPU y memoria de Cloudflare en producción.
+- El envío de correo y Turnstile no se probaron en el Worker: no hay proveedor ni claves. Se probaron con respuestas simuladas en las pruebas de servidor.
+- No se probó una subida total cercana a 150 MB. El límite sí está activo; el caso grande se verificó solo con archivos de 12 y 16 MB.
+- `wrangler dev` registra como error las cancelaciones de cliente cuando el Worker corta una subida a mitad (413). Es el comportamiento esperado.
+- El log del emulador no mostró excepciones de la aplicación durante las pruebas.
+
 ## 2. Arquitectura recomendada para producción
 
 Objetivo: el menor número de servicios, todos con plan gratuito al inicio, sin pagos.
@@ -30,13 +60,7 @@ Objetivo: el menor número de servicios, todos con plan gratuito al inicio, sin 
 | Correo | Resend | Confirmaciones y avisos | 3.000 al mes y 100 al día |
 | Respaldos | Exportación programada de D1 y copia de R2 a una cuenta privada | D1 y R2 no tienen respaldo automático en plan gratuito | Según cuenta elegida |
 
-**Trabajo técnico necesario antes de desplegar:** el servidor actual usa APIs de Node (`node:sqlite`, `node:crypto` con scrypt, `busboy`). En Workers hay que reemplazar:
-- `node:sqlite` por D1 (mismo SQL, otro cliente).
-- scrypt por PBKDF2 con Web Crypto (o un módulo WASM), con iteraciones acordes a su proveedor.
-- `busboy` por el lector `FormData` del runtime.
-- El sistema de archivos por R2.
-
-Esto es una migración acotada, no un rediseño: la lógica de dominio (`packages/*`) no cambia.
+**Trabajo técnico para Workers: completado y verificado en local (ver sección 1.1).** El núcleo del servidor ya no depende de `node:sqlite`, `busboy` ni scrypt: la base es D1 y los archivos van a R2 mediante una interfaz. `node:sqlite` queda solo en el adaptador local de desarrollo. La lógica de dominio (`packages/*`) no cambió.
 
 **Alternativa:** Supabase (Postgres + Storage privado) con un Worker o Edge Function. Requiere cuenta y el plan Pro para respaldos automáticos y para evitar la pausa por inactividad.
 
@@ -57,12 +81,12 @@ Esto es una migración acotada, no un rediseño: la lógica de dominio (`package
 | Fotos privadas | Fuera de la carpeta pública; acceso solo con sesión; publicación solo por reglas (probado) |
 | Notas internas | Nunca en respuestas públicas (probado) |
 | Claves | Clave en archivo 0600 fuera del repositorio (desarrollo); en producción por variable obligatoria |
-| Contraseña y TOTP | Contraseña con scrypt y sal; TOTP cifrado en reposo con AES-256-GCM (probado) |
-| Permisos de base de datos | SQLite local no tiene roles. En D1/Postgres: un solo usuario de servicio, sin acceso público (**pendiente**) |
+| Contraseña y TOTP | Contraseña con PBKDF2-SHA256 (100 000 iteraciones y sal, límite de Workers); TOTP cifrado en reposo con AES-256-GCM (probado) |
+| Permisos de base de datos | D1 se accede solo desde el Worker, con el binding; sin API pública. Un solo usuario de servicio con permisos mínimos debe configurarse en la cuenta (**pendiente de cuenta**) |
 | Errores | Sin rastros, rutas ni datos internos (probado) |
 | Cabeceras | CSP estricta en el panel, `nosniff`, `frame-ancestors`, `Referrer-Policy: same-origin` (probado) |
-| Carga de archivos | Tipo por contenido, límites de tamaño y de cantidad, nombres sanitizados (probado) |
-| Metadatos EXIF/GPS | **Pendiente:** las fotos se guardan tal cual. Antes de publicar hay que eliminar EXIF/GPS (requiere procesamiento de imagen). |
+| Carga de archivos | Tipo por contenido, límites de tamaño y de cantidad, límite de bytes reales aunque falte `Content-Length`, nombres sanitizados (probado en Node y en Workers) |
+| Metadatos EXIF/GPS | Eliminados antes de guardar en JPEG, PNG y WebP (probado en Node y en Workers). HEIC se rechaza hasta contar con un decodificador seguro. |
 | Escaneo antimalware | **No incluido** (sin proveedor). Riesgo aceptado y documentado. |
 | Revisión de terceros | **Pendiente** antes de tráfico real |
 
