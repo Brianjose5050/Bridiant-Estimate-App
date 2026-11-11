@@ -11,11 +11,12 @@
     "admin:create": "node dist/cli/create-admin.js"
   },
   "dependencies": {
+    "@bridiant/gallery": "*",
     "@bridiant/intake": "*",
-    "busboy": "^1.6.0",
-    "@bridiant/gallery": "*"
+    "busboy": "^1.6.0"
   },
   "devDependencies": {
-    "@types/busboy": "^1.5.4"
+    "@types/busboy": "^1.5.4",
+    "wrangler": "^4.160.1"
   }
 }

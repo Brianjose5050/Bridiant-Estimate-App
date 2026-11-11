@@ -1,0 +1,16 @@
+# Cloudflare Worker configuration template. Nothing here creates resources.
+# Before deploying: create the D1 database and the private R2 bucket in YOUR account,
+# then paste their identifiers below. Secrets are set with `wrangler secret put` (never in this file).
+name = "bridiant-server"
+main = "dist/worker.js"
+compatibility_date = "2026-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "bridiant-prod"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "PRIVATE_FILES"
+bucket_name = "bridiant-private-files"

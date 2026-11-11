@@ -92,19 +92,31 @@ export function extractCsrf(html: string): string {
   return m?.[1] ?? '';
 }
 
+/** A structurally valid JPEG (JFIF, quantisation, frame, scan, end). Padding is scan data. */
 export function jpeg(size = 2048): Buffer {
-  const b = Buffer.alloc(size, 7);
-  b[0] = 0xff;
-  b[1] = 0xd8;
-  b[2] = 0xff;
-  b[3] = 0xe0;
-  return b;
+  const soi = Buffer.from([0xff, 0xd8]);
+  const app0 = Buffer.from([0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00]);
+  const dqt = Buffer.from([0xff, 0xdb, 0x00, 0x43, 0x00, ...Array(64).fill(8)]);
+  const sof = Buffer.from([0xff, 0xc0, 0x00, 0x0b, 0x08, 0x00, 0x01, 0x00, 0x01, 0x01, 0x01, 0x11, 0x00]);
+  const sos = Buffer.from([0xff, 0xda, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3f, 0x00]);
+  const scan = Buffer.alloc(size, 0x55);
+  return Buffer.concat([soi, app0, dqt, sof, sos, scan, Buffer.from([0xff, 0xd9])]);
 }
 
+/** A structurally valid PNG (signature, IHDR, IDAT, IEND). */
 export function png(size = 1024): Buffer {
-  const b = Buffer.alloc(size, 3);
-  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(b);
-  return b;
+  const crc = Buffer.alloc(4);
+  const chunk = (type: string, data: Buffer) => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    return Buffer.concat([len, Buffer.from(type, 'latin1'), data, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(1, 0);
+  ihdr.writeUInt32BE(1, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 2;
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr), chunk('IDAT', Buffer.alloc(size, 3)), chunk('IEND', Buffer.alloc(0))]);
 }
 
 export function pdf(size = 1500): Buffer {

@@ -4,6 +4,7 @@ import { buildPublishPlan, validatePair, type GalleryItem, type GalleryPair, typ
 import type { Config } from './config.js';
 import type { Db } from './db.js';
 import { audit, nowIso } from './db.js';
+import { stripMetadata } from './metadata.js';
 import { detectFileType, extensionFor, randomToken, sha256Hex, type DetectedType } from './security.js';
 
 /**
@@ -13,7 +14,7 @@ import { detectFileType, extensionFor, randomToken, sha256Hex, type DetectedType
  */
 
 export const PHOTO_KINDS = ['unclassified', 'before', 'after', 'regular'] as const;
-export const PHOTO_TYPES: DetectedType[] = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
+export const PHOTO_TYPES: DetectedType[] = ['image/jpeg', 'image/png', 'image/webp'];
 export const SERVICE_IDS = ['standard-cleaning', 'deep-cleaning', 'move-in-cleaning', 'move-out-cleaning'] as const;
 export type PhotoKind = (typeof PHOTO_KINDS)[number];
 
@@ -176,13 +177,19 @@ export async function uploadPhotos(db: Db, cfg: Config, files: Array<{ displayNa
     const type = detectFileType(file.buffer);
     if (!type || !PHOTO_TYPES.includes(type)) throw new Error('unsupported_file');
     if (file.buffer.length === 0) throw new Error('empty_file');
+    let clean: Buffer;
+    try {
+      clean = stripMetadata(file.buffer, type);
+    } catch {
+      throw new Error('unsupported_file');
+    }
     const storage = `${randomToken(18)}.${extensionFor(type)}`;
-    await writeFile(join(cfg.privateDir, 'gallery', storage), file.buffer, { mode: 0o600, flag: 'wx' });
+    await writeFile(join(cfg.privateDir, 'gallery', storage), clean, { mode: 0o600, flag: 'wx' });
     const now = nowIso();
     const maxSort = (db.prepare('SELECT COALESCE(MAX(sort_order), 0) AS m FROM gallery_photo').get() as { m: number }).m;
     db.prepare(
       'INSERT INTO gallery_photo (display_name, mime, bytes, sha256, storage_name, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    ).run(file.displayName, type, file.buffer.length, sha256Hex(file.buffer), storage, maxSort + 1, now, now);
+    ).run(file.displayName, type, clean.length, sha256Hex(clean), storage, maxSort + 1, now, now);
     added += 1;
   }
   audit(db, 'gallery_uploaded', 'gallery_photo', null, { count: added });

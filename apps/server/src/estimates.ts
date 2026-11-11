@@ -7,6 +7,7 @@ import type { Config } from './config.js';
 import type { Db } from './db.js';
 import { allowRate, audit, nowIso } from './db.js';
 import { queueRequestEmails } from './email.js';
+import { stripMetadata } from './metadata.js';
 import { detectFileType, extensionFor, hashIp, randomToken, safeDisplayName, sha256Hex, type DetectedType } from './security.js';
 
 export interface UploadedFile {
@@ -85,7 +86,8 @@ export function parseMultipart(req: IncomingMessage, cfg: Config): Promise<Parse
   });
 }
 
-const PHOTO_TYPES: DetectedType[] = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
+// HEIC is refused until a safe metadata-removal path exists (see metadata.ts).
+const PHOTO_TYPES: DetectedType[] = ['image/jpeg', 'image/png', 'image/webp'];
 
 /** Validates that each file is a real, allowed photo by its content. Returns the detected type. */
 export function validatePhotos(files: UploadedFile[]): { ok: true; typed: Array<UploadedFile & { type: DetectedType }> } | { ok: false; code: string } {
@@ -94,7 +96,12 @@ export function validatePhotos(files: UploadedFile[]): { ok: true; typed: Array<
     if (file.buffer.length === 0) return { ok: false, code: 'empty_file' };
     const type = detectFileType(file.buffer);
     if (!type || !PHOTO_TYPES.includes(type)) return { ok: false, code: 'unsupported_file' };
-    typed.push({ ...file, type });
+    try {
+      // Location and camera metadata are removed before anything is stored.
+      typed.push({ ...file, buffer: stripMetadata(file.buffer, type), type });
+    } catch {
+      return { ok: false, code: 'unsupported_file' };
+    }
   }
   return { ok: true, typed };
 }

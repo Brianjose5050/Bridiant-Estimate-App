@@ -262,8 +262,8 @@ export function handleGallery(ctx: GalleryCtx, base: GalleryBase): Promise<Galle
     </section>
     <form method="post" action="/admin/gallery/upload" enctype="multipart/form-data" class="card stack">
       <input type="hidden" name="csrf" value="${esc(csrf)}">
-      <label class="field"><span>${L(lang, 'Upload photos', 'Subir fotos')}</span><input type="file" name="photos" accept="image/jpeg,image/png,image/webp,image/heic" multiple required></label>
-      <p class="muted small">${L(lang, 'JPEG, PNG, WebP, or HEIC. Up to 15 MB each. No limit on the number of photos.', 'JPEG, PNG, WebP o HEIC. Hasta 15 MB cada una. Sin límite de número de fotos.')}</p>
+      <label class="field"><span>${L(lang, 'Upload photos', 'Subir fotos')}</span><input type="file" name="photos" accept="image/jpeg,image/png,image/webp" multiple required></label>
+      <p class="muted small">${L(lang, 'JPEG, PNG, or WebP. Up to 15 MB each. Location data is removed automatically. No limit on the number of photos.', 'JPEG, PNG, WebP o HEIC. Hasta 15 MB cada una. Sin límite de número de fotos.')}</p>
       <button class="btn btn--primary" type="submit">${L(lang, 'Upload', 'Subir')}</button>
     </form>
     <section class="card stack">

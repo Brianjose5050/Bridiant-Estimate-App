@@ -17,7 +17,7 @@ export type RequestStatus = (typeof REQUEST_STATUSES)[number];
 
 export const SCHEMA_VERSION = 1;
 
-const SCHEMA = `
+export const SCHEMA = `
 CREATE TABLE IF NOT EXISTS schema_meta (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
