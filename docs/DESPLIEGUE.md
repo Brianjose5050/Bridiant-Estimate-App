@@ -49,7 +49,44 @@ npm run build:production -w @bridiant/public         # restaura el build de prod
 
 Requiere `apps/server/.dev.vars` con `BRIDIANT_SECRET_KEY` (32 bytes en base64) y `BRIDIANT_IP_SALT`. Ambos archivos están fuera de git.
 
-Resultado de la última ejecución: **48/48**. Detalle y limitaciones en `docs/PRODUCCION.md`, sección 1.1.
+Suites de navegador (requieren Chromium instalado; `BRIDIANT_CHROMIUM` opcional; Playwright se carga desde el entorno):
+
+```bash
+BRIDIANT_BASE_URL=http://127.0.0.1:8788 BRIDIANT_OWNER_TOTP=<secreto> node e2e/customer-owner.mjs
+BRIDIANT_BASE_URL=http://127.0.0.1:8788 BRIDIANT_OWNER_TOTP=<secreto> node e2e/gallery-owner.mjs
+```
+
+Ambas necesitan estado recién reiniciado. Con credenciales incorrectas fallan y salen con código 1.
+
+Resultados de la última ejecución: smoke **48/48**; navegador cliente y propietario **30/30**; galería **9/9**. Detalle y limitaciones en `docs/PRODUCCION.md`, sección 1.1.
+
+## Inicialización de D1 remoto (comando construido, no ejecutado contra su cuenta)
+
+Comando: `apps/server/src/cli/d1-init-remote.ts` (`npm run d1:init-remote` desde `apps/server`). Usa las mismas funciones de producción (`createAdmin`, `seedWelcomePacket`) a través de un adaptador de la API REST de D1. No usa SQLite local.
+
+**Protecciones:**
+- Solo acepta la base `bridiant-prod`. Cualquier otro nombre se rechaza antes de hacer una petición.
+- Simulación por defecto: sin `--apply` solo lee y muestra el plan. No escribe nada.
+- Escribir exige `--apply --confirm bridiant-prod` (repetir el nombre).
+- Si ya existe un propietario, **no crea otro**. Sigue el sembrado de capítulos, que solo añade los que faltan.
+- Si hay más de una fila de propietario, se detiene y no cambia nada.
+- Si el esquema no está migrado o la versión no coincide, se detiene antes de escribir.
+- Contraseña de al menos 12 caracteres, validada antes de cualquier escritura. Se lee de `BRIDIANT_OWNER_PASSWORD` o de `--password-file`, nunca como argumento de la línea de órdenes.
+- Solo se imprime una vez el secreto del autenticador del propietario, en la terminal. No se guarda ni se registra.
+- El token de la API nunca aparece en mensajes de error. Los errores no muestran el SQL ni los parámetros.
+- El adaptador rechaza `batch`: ninguna escritura multi-sentencia puede quedar a medias sin avisar.
+- Los capítulos nuevos quedan sin aprobar y sin publicar. Los capítulos existentes nunca se sobrescriben.
+
+**Variables** (solo en el entorno de la terminal del propietario): `CLOUDFLARE_ACCOUNT_ID`, `BRIDIANT_D1_DATABASE_ID`, `CLOUDFLARE_API_TOKEN` (permiso mínimo sobre D1), `BRIDIANT_SECRET_KEY` (la misma clave que el secreto del Worker, en base64), y `BRIDIANT_OWNER_PASSWORD`.
+
+**Orden de uso** (una sola vez):
+1. Simulación: `npm run d1:init-remote -- --database bridiant-prod --username <nombre>` con las variables. Debe mostrar `Owner accounts present before: 0` y `missing: 5`, sin escribir nada. Esta es también la primera llamada real a la API: si la respuesta no tiene la forma esperada, falla sin escribir.
+2. Escritura: la misma orden con `--apply --confirm bridiant-prod`. Guarde el secreto que aparece.
+3. Repetir la simulación: debe mostrar `Owner accounts present before: 1`.
+
+**Verificado:** 12 pruebas con una simulación de la API REST respaldada por SQLite (incluye segunda ejecución sin duplicados, capítulo publicado que no se sobrescribe, esquema ausente, contraseña corta, token que no aparece en errores). Los rechazos del CLI se comprobaron en el binario compilado sin ninguna conexión de red.
+
+**Sin verificar:** la forma exacta de las respuestas de la API REST de Cloudflare. La simulación sigue la documentación conocida, pero la primera simulación contra su base real es la prueba decisiva.
 
 ## Qué falta exactamente para conectar la cuenta y publicar
 
@@ -61,7 +98,7 @@ En este orden:
 4. **Secretos del Worker** con `wrangler secret put`: `BRIDIANT_SECRET_KEY`, `BRIDIANT_IP_SALT`, `BRIDIANT_TURNSTILE_SECRET`, `BRIDIANT_EMAIL_API_KEY`, `BRIDIANT_OWNER_EMAIL`, `BRIDIANT_EMAIL_FROM`, `BRIDIANT_ADMIN_URL`. Las claves de Turnstile y de Resend las crea usted.
 5. **Dominio** y dominio de envío verificado en Resend (registros DNS que usted publica).
 6. **Clave de respaldo** (`BRIDIANT_BACKUP_KEY`) generada y guardada fuera de Cloudflare.
-7. **Cuenta del propietario y Welcome Packet en D1 remoto.** Falta un paso: hoy `create-admin` y `seed-welcome` solo escriben en SQLite local. Hay que construir antes de publicar un comando que use el mismo código contra D1 remoto, sin imprimir secretos fuera de la terminal del propietario.
+7. **Inicializar D1 remoto** con `npm run d1:init-remote` (ver la sección «Inicialización de D1 remoto»). Crea el propietario y siembra el Welcome Packet con el mismo código de producción. Primero una simulación; luego la escritura, una sola vez.
 8. **Aprobación de contenido**: capítulos del Welcome Center en inglés y español, revisión de español, y las decisiones pendientes (HEIC rechazado; checklist y descargo de Move-Out; programa de referidos y lista de precios de complementos, que no se publican).
 9. **Decisión sobre el despliegue actual de Vercel** (`bridiant-estimate-app.vercel.app`), que muestra precios en el navegador.
 10. Recién entonces: `wrangler deploy` del Worker, subida del sitio de producción, y prueba de humo en la URL real.

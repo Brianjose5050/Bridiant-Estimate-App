@@ -5,7 +5,7 @@ import { constantTimeEqual, decryptSecret, encryptSecret, generateTotpSecret, ha
 
 export const SESSION_IDLE_MS = 30 * 60 * 1000;
 export const SESSION_ABSOLUTE_MS = 12 * 60 * 60 * 1000;
-const MIN_PASSWORD_LENGTH = 12;
+export const MIN_PASSWORD_LENGTH = 12;
 
 // Used only to keep timing similar when no owner account exists yet.
 const DUMMY_HASH = 'pbkdf2-sha256$100000$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';

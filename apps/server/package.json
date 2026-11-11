@@ -9,7 +9,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
     "admin:create": "node dist/cli/create-admin.js",
-    "seed:welcome": "node dist/cli/seed-welcome.js"
+    "seed:welcome": "node dist/cli/seed-welcome.js",
+    "d1:init-remote": "node dist/cli/d1-init-remote.js"
   },
   "dependencies": {
     "@bridiant/gallery": "*",

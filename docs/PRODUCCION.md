@@ -45,6 +45,28 @@ Se ejecutó el Worker real (`apps/server/src/worker.ts`) con `wrangler dev`, usa
 - `wrangler dev` registra como error las cancelaciones de cliente cuando el Worker corta una subida a mitad (413). Es el comportamiento esperado.
 - El log del emulador no mostró excepciones de la aplicación durante las pruebas.
 
+### 1.2 Verificación final de la preparación (repositorio completo)
+
+| Verificación | Resultado |
+|---|---|
+| `npm run check` (tipos, paleta, todas las pruebas) | **184/184** en 16 archivos |
+| `npm run check:public` (guardia del build de producción) | **PASA**. Antes fallaba en silencio: el guardia usaba el modo `preview` por defecto. Ahora usa `production`. Prueba negativa: con un marcador no publicado en `dist`, falla con código 1 |
+| Smoke del Worker (`workers-smoke.mjs`), desde estado limpio | **48/48**, código 0; log del Worker sin errores de aplicación |
+| Navegador desde el repositorio (`e2e/customer-owner.mjs`, `e2e/gallery-owner.mjs`) | **30/30** y **9/9**, código 0. Prueba negativa con credenciales incorrectas: falla con código 1 |
+| Inicialización remota (`init-remote.test.ts`) | **12/12**: simulación, escritura, sin duplicados, sin sobrescritura, esquema, contraseña, token fuera de errores |
+| CLI compilado, rechazos sin red | Nombre de base erróneo: código 2. Escritura sin confirmación: código 2. Sin variables: código 2. Argumento desconocido: código 2 |
+| Bundle del Worker (`wrangler deploy --dry-run`) | Construye, sin desplegar |
+| Revisión de los 12 commits pendientes | Sin secretos, credenciales ni temporales. Los hallazgos del escaneo son cadenas de prueba, hashes ficticios y el alfabeto base32. Ninguna base, clave, `dist`, `.wrangler`, `.dev.vars` ni captura aparece en el historial. Los PNG de `icons/` ya estaban en el repositorio original |
+
+**Errores pendientes y límites conocidos:**
+1. **La inicialización remota no se ha ejecutado contra D1 real.** La forma de las respuestas de la API REST se verificó solo contra una simulación. La primera simulación (sin `--apply`) contra su base es la prueba decisiva.
+2. **El adaptador REST de D1 no soporta `batch`.** La inicialización no lo necesita. Las ediciones del Welcome Center sí lo usan, pero en producción el Worker usa el binding de D1, no la API REST, así que no afecta al panel desplegado.
+3. El correo (Resend) y Turnstile no se han probado en el runtime real: no hay proveedor ni claves. Están probados con respuestas simuladas.
+4. Una subida total cercana a 150 MB no se ha probado. El límite está activo; se verificó con archivos de 12 y 16 MB.
+5. Las suites de navegador necesitan Chromium instalado. No descargan nada, y el estado debe estar reiniciado para las comprobaciones de Welcome Center.
+6. Los 12 commits siguen sin subir al remoto (ver el informe).
+7. El respaldo cifrado se verificó en local con datos de prueba. **No se ha probado una restauración desde un respaldo de la base remota**, porque no existe todavía.
+
 ## 2. Arquitectura recomendada para producción
 
 Objetivo: el menor número de servicios, todos con plan gratuito al inicio, sin pagos.
@@ -102,4 +124,12 @@ Objetivo: el menor número de servicios, todos con plan gratuito al inicio, sin 
 
 ## 6. Veredicto
 
-El sitio está **terminado y probado en local**. **No está listo para recibir clientes reales** hasta: migrar el almacenamiento y la base a servicios duraderos, configurar correo y verificación humana, eliminar metadatos de fotos, activar respaldos verificados por restauración y tener su aprobación de contenido.
+El código está **terminado, portado a Cloudflare Workers y probado de extremo a extremo en el runtime local** (sección 1.2). Lo que falta no es código sino acciones del propietario y una primera ejecución controlada:
+
+1. Crear la cuenta y los recursos (D1 y R2 privados), y pegar el identificador de D1 en `wrangler.toml`.
+2. Configurar los secretos del Worker, Turnstile, Resend y el dominio verificado.
+3. Ejecutar la inicialización remota: primero simulación, luego escritura, una sola vez.
+4. Aprobar el contenido (sección 5) y decidir sobre el despliegue actual de Vercel.
+5. Desplegar, y hacer una prueba de humo sobre la URL real antes de anunciarla.
+
+Hasta entonces, **no está listo para recibir clientes reales**.
