@@ -1,0 +1,20 @@
+---
+import Base from '../../../layouts/Base.astro';
+import ServiceCard from '../../../components/ServiceCard.astro';
+import PageHero from '../../../components/PageHero.astro';
+import { LANGS, pages, services, servicesReady, text, ui, type Lang } from '../../../lib/site';
+
+export function getStaticPaths() {
+  return LANGS.filter((lang) => servicesReady(lang)).map((lang) => ({ params: { lang } }));
+}
+const { lang } = Astro.params as { lang: Lang };
+const intro = text('servicesIntro', lang);
+---
+<Base lang={lang} title={`${ui('nav.services', lang)} · Bridiant Facility Group`} description={intro ?? ''} page={pages.services}>
+  <PageHero eyebrow={lang === 'en' ? 'Residential cleaning' : 'Limpieza residencial'} title={ui('nav.services', lang)} lead={intro ?? undefined} />
+  <section class="section" style="padding-top:0">
+    <div class="wrap grid grid--2">
+      {services.map((service) => <ServiceCard service={service} lang={lang} />)}
+    </div>
+  </section>
+</Base>

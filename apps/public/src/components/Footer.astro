@@ -1,0 +1,49 @@
+---
+import { href, pages, text, ui, type Lang } from '../lib/site';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const tagline = text('footer.tagline', lang);
+const year = new Date().getFullYear();
+const contacts = [
+  { label: lang === 'en' ? 'Phone' : 'Teléfono', value: text('contact.phone', lang) },
+  { label: lang === 'en' ? 'Email' : 'Correo', value: text('contact.email', lang) },
+  { label: lang === 'en' ? 'Hours' : 'Horario', value: text('contact.hours', lang) },
+  { label: lang === 'en' ? 'Service area' : 'Zona de servicio', value: text('contact.serviceArea', lang) },
+].filter((c) => c.value !== null);
+---
+<footer class="site-footer" id="contact">
+  <div class="wrap">
+    <div class="grid grid--3">
+      <div style="display:grid;gap:14px">
+        <strong style="font-size:1.25rem;letter-spacing:-0.01em">Bridiant <span style="font-weight:400">Facility Group</span></strong>
+        {tagline && <p class="small">{tagline}</p>}
+      </div>
+      <nav aria-label={lang === 'en' ? 'Footer' : 'Pie de página'}>
+        <ul>
+          <li><a href={href(lang, pages.services)}>{ui('nav.services', lang)}</a></li>
+          <li><a href={href(lang, pages.work)}>{ui('nav.ourWork', lang)}</a></li>
+          <li><a href={href(lang, pages.standards)}>{ui('nav.standards', lang)}</a></li>
+          <li><a href={href(lang, pages.welcome)}>{ui('nav.welcome', lang)}</a></li>
+          <li><a href={href(lang, pages.request)}>{ui('nav.requestEstimate', lang)}</a></li>
+        </ul>
+      </nav>
+      <div>
+        {contacts.length > 0 && (
+          <ul>
+            {contacts.map((c) => (
+              <li><span class="small">{c.label}</span><br />{c.value}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+    <div class="footer-base">
+      <span>© {year} Bridiant Facility Group</span>
+      <span style="display:flex;gap:18px">
+        <a href={href(lang, pages.privacy)}>{lang === 'en' ? 'Privacy' : 'Privacidad'}</a>
+        <a href={href(lang, pages.terms)}>{lang === 'en' ? 'Terms' : 'Términos'}</a>
+      </span>
+    </div>
+  </div>
+</footer>

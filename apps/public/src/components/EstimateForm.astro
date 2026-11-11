@@ -1,0 +1,373 @@
+---
+import { copyItem, estimateNotReceivedMessage, isShown, services, text, ui, type Lang } from '../lib/site';
+
+interface Props {
+  lang: Lang;
+  preselect?: string | null;
+}
+const { lang, preselect = null } = Astro.props;
+
+const L = (en: string, es: string) => (lang === 'en' ? en : es);
+const homeTypes = [
+  { value: 'house', en: 'House', es: 'Casa' },
+  { value: 'apartment', en: 'Apartment or condo', es: 'Apartamento o condominio' },
+  { value: 'townhouse', en: 'Townhouse', es: 'Casa adosada' },
+  { value: 'other', en: 'Other', es: 'Otro' },
+];
+const frequencies = [
+  { value: 'one-time', en: 'One time', es: 'Una vez' },
+  { value: 'weekly', en: 'Weekly', es: 'Semanal' },
+  { value: 'biweekly', en: 'Every two weeks', es: 'Cada dos semanas' },
+  { value: 'monthly', en: 'Monthly', es: 'Mensual' },
+];
+const bedrooms = ['1', '2', '3', '4', '5+'];
+const bathrooms = ['1', '2', '3', '4+'];
+
+const intro = text('form.intro', lang);
+const photosHelp = text('form.photosHelp', lang);
+const consent = text('form.consent', lang);
+const emailItem = copyItem('contact.email');
+const emailAddress = emailItem && isShown(emailItem.status, lang) && !emailItem[lang].startsWith('[OWNER') ? emailItem[lang] : null;
+
+const messages = {
+  lang,
+  required: ui('form.required', lang),
+  serviceRequired: L('Choose at least one service.', 'Elija al menos un servicio.'),
+  frequencyRequired: L('Choose how often you would like the service.', 'Elija con qué frecuencia desea el servicio.'),
+  contactRequired: L('Add a phone number or an email address so we can reply.', 'Agregue un teléfono o un correo para poder responderle.'),
+  consentRequired: L('Please confirm the consent box to send your request.', 'Confirme la casilla de consentimiento para enviar su solicitud.'),
+  fixErrors: L('Please fix the items below.', 'Corrija los puntos indicados.'),
+  sending: L('Sending your request…', 'Enviando su solicitud…'),
+  unavailableTitle: L('Your request was not sent.', 'Su solicitud no se envió.'),
+  unavailableBody: estimateNotReceivedMessage(lang),
+  tryAgain: L('Try again', 'Intentar de nuevo'),
+  saveCopy: L('Save a copy of my answers', 'Guardar una copia de mis respuestas'),
+  emailUs: L('Email us instead', 'Escríbanos por correo'),
+  photosSelected: L('photo(s) selected. Photos are sent after your request is received.', 'foto(s) seleccionadas. Las fotos se envían después de recibir su solicitud.'),
+  photoTooLarge: L('This photo is larger than 15 MB. Please choose a smaller one.', 'Esta foto supera 15 MB. Elija una más pequeña.'),
+  copyFileName: 'bridiant-estimate-request.txt',
+  emailAddress,
+  emailSubject: L('Estimate request', 'Solicitud de estimado'),
+  endpointConfigured: false,
+};
+---
+<form class="form" id="estimate-form" novalidate data-endpoint="" data-lang={lang}>
+  {intro && <p class="lead" style="font-size:1.02rem">{intro}</p>}
+
+  <fieldset data-field="services">
+    <legend>{L('Which services do you need?', '¿Qué servicios necesita?')} <span class="opt">{L('Choose one or more', 'Elija uno o más')}</span></legend>
+    <div class="choices">
+      {services.map((s) => (
+        <label class="choice">
+          <input type="checkbox" name="services" value={s.id} checked={preselect === s.id} />
+          <span>{s.name[lang]}</span>
+        </label>
+      ))}
+    </div>
+    <p class="error-text" data-error="services" hidden></p>
+  </fieldset>
+
+  <fieldset>
+    <legend>{L('What kind of home?', '¿Qué tipo de hogar?')}</legend>
+    <div class="choices">
+      {homeTypes.map((t, i) => (
+        <label class="choice">
+          <input type="radio" name="homeType" value={t.value} checked={i === 0} />
+          <span>{t[lang]}</span>
+        </label>
+      ))}
+    </div>
+  </fieldset>
+
+  <div class="row-2">
+    <label class="field">
+      {L('Bedrooms', 'Dormitorios')}
+      <select name="bedrooms">
+        {bedrooms.map((b) => <option value={b.replace('+', '-plus')}>{b}</option>)}
+      </select>
+    </label>
+    <label class="field">
+      {L('Bathrooms', 'Baños')}
+      <select name="bathrooms">
+        {bathrooms.map((b) => <option value={b.replace('+', '-plus')}>{b}</option>)}
+      </select>
+    </label>
+  </div>
+
+  <fieldset data-show-when="standard-cleaning" hidden>
+    <legend>{L('How often?', '¿Con qué frecuencia?')} <span class="opt">{L('Required for Standard Cleaning', 'Obligatorio para la limpieza estándar')}</span></legend>
+    <div class="choices">
+      {frequencies.map((f, i) => (
+        <label class="choice">
+          <input type="radio" name="frequency" value={f.value} checked={i === 2} />
+          <span>{f[lang]}</span>
+        </label>
+      ))}
+    </div>
+    <p class="error-text" data-error="frequency" hidden></p>
+  </fieldset>
+
+  <label class="field" data-show-when="move" hidden>
+    {L('Move date', 'Fecha de mudanza')} <span class="opt">{L('Optional', 'Opcional')}</span>
+    <input type="date" name="moveDate" />
+  </label>
+
+  <div class="row-2">
+    <label class="field">
+      {L('Full name', 'Nombre completo')}
+      <input type="text" name="name" autocomplete="name" required />
+      <span class="error-text" data-error="name" hidden></span>
+    </label>
+    <label class="field">
+      {L('Phone', 'Teléfono')} <span class="opt">{L('or email', 'o correo')}</span>
+      <input type="tel" name="phone" inputmode="tel" autocomplete="tel" />
+    </label>
+  </div>
+
+  <div class="row-2">
+    <label class="field">
+      {L('Email', 'Correo')} <span class="opt">{L('optional', 'opcional')}</span>
+      <input type="email" name="email" inputmode="email" autocomplete="email" autocapitalize="off" />
+    </label>
+    <label class="field">
+      {L('ZIP code', 'Código postal')} <span class="opt">{L('optional', 'opcional')}</span>
+      <input type="text" name="zip" inputmode="numeric" autocomplete="postal-code" maxlength="5" />
+    </label>
+  </div>
+  <p class="error-text" data-error="contact" hidden></p>
+
+  <label class="field">
+    {L('Anything we should know?', '¿Algo que debamos saber?')} <span class="opt">{L('optional', 'opcional')}</span>
+    <textarea name="notes" maxlength="500" rows="4"></textarea>
+  </label>
+
+  <label class="field">
+    {L('Photos', 'Fotos')} <span class="opt">{L('optional', 'opcional')}</span>
+    <input type="file" name="photos" accept="image/*" multiple />
+    {photosHelp && <span class="help">{photosHelp}</span>}
+    <span class="help" data-photo-count aria-live="polite"></span>
+  </label>
+
+  <label class="choice" style="align-items:flex-start">
+    <input type="checkbox" name="consent" style="margin-top:3px" />
+    <span style="font-size:0.95rem;line-height:1.5">{consent ?? L('Consent text pending owner approval.', 'Texto de consentimiento pendiente de aprobación del propietario.')}</span>
+  </label>
+  <p class="error-text" data-error="consent" hidden></p>
+
+  <div class="hp" aria-hidden="true">
+    <label>Website <input type="text" name="website" tabindex="-1" autocomplete="off" /></label>
+  </div>
+
+  <div class="actions">
+    <button type="submit" class="btn btn--primary" data-submit>{L('Send request', 'Enviar solicitud')}</button>
+  </div>
+
+  <div class="status" role="status" aria-live="polite" data-status hidden></div>
+</form>
+
+<script id="form-messages" type="application/json" set:html={JSON.stringify(messages)}></script>
+<script>
+  const form = document.getElementById('estimate-form') as HTMLFormElement | null;
+  const messagesEl = document.getElementById('form-messages');
+  if (form && messagesEl) {
+    const m = JSON.parse(messagesEl.textContent ?? '{}') as Record<string, string | boolean | null>;
+    const endpoint = form.dataset.endpoint ?? '';
+    const statusBox = form.querySelector<HTMLElement>('[data-status]')!;
+    const submitBtn = form.querySelector<HTMLButtonElement>('[data-submit]')!;
+    const photoInput = form.querySelector<HTMLInputElement>('input[name="photos"]')!;
+    const photoCount = form.querySelector<HTMLElement>('[data-photo-count]')!;
+    const idempotencyKey = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`).padEnd(16, '0');
+
+    const checkedServices = () => Array.from(form.querySelectorAll<HTMLInputElement>('input[name="services"]:checked')).map((i) => i.value);
+
+    const refreshConditionals = () => {
+      const services = checkedServices();
+      const freq = form.querySelector<HTMLElement>('[data-show-when="standard-cleaning"]')!;
+      const move = form.querySelector<HTMLElement>('[data-show-when="move"]')!;
+      freq.hidden = !services.includes('standard-cleaning');
+      move.hidden = !services.some((s) => s === 'move-in-cleaning' || s === 'move-out-cleaning');
+    };
+    form.addEventListener('change', refreshConditionals);
+    const DRAFT_KEY = 'bridiant-estimate-draft-v1';
+    const writeDraft = (state: Record<string, unknown>) => {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(state));
+      } catch {
+        /* Storage blocked (private mode): the form still works, the customer keeps the Save a copy option. */
+      }
+    };
+    const readDraft = (): Record<string, unknown> | null => {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null');
+        return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
+      } catch {
+        return null;
+      }
+    };
+    const draft = readDraft();
+    if (draft) {
+      const text = ['name', 'phone', 'email', 'zip', 'notes', 'moveDate', 'bedrooms', 'bathrooms'];
+      for (const field of text) {
+        const el = form.elements.namedItem(field) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
+        if (el && typeof draft[field] === 'string') el.value = draft[field] as string;
+      }
+      for (const radio of ['homeType', 'frequency']) {
+        const value = draft[radio];
+        if (typeof value === 'string') {
+          const el = form.querySelector<HTMLInputElement>(`input[name="${radio}"][value="${value}"]`);
+          if (el) el.checked = true;
+        }
+      }
+      const saved = Array.isArray(draft.services) ? (draft.services as string[]) : [];
+      form.querySelectorAll<HTMLInputElement>('input[name="services"]').forEach((input) => {
+        input.checked = saved.includes(input.value);
+      });
+      const consentEl = form.querySelector<HTMLInputElement>('input[name="consent"]');
+      if (consentEl) consentEl.checked = draft.consent === true;
+    }
+
+    const preselectedService = new URLSearchParams(window.location.search).get('service');
+    if (preselectedService) {
+      form.querySelectorAll<HTMLInputElement>('input[name="services"]').forEach((input) => {
+        input.checked = input.value === preselectedService;
+      });
+    }
+    refreshConditionals();
+
+    photoInput.addEventListener('change', () => {
+      const files = Array.from(photoInput.files ?? []);
+      const tooLarge = files.some((f) => f.size > 15 * 1024 * 1024);
+      photoCount.textContent = files.length > 0 ? `${files.length} ${m.photosSelected}` : '';
+      photoCount.textContent += tooLarge ? ` ${m.photoTooLarge}` : '';
+    });
+
+    const setError = (key: string, message: string | null) => {
+      const el = form.querySelector<HTMLElement>(`[data-error="${key}"]`);
+      if (!el) return;
+      el.textContent = message ?? '';
+      el.hidden = !message;
+    };
+
+    const collect = () => {
+      const data = new FormData(form);
+      const services = checkedServices();
+      const standard = services.includes('standard-cleaning');
+      const move = services.some((s) => s === 'move-in-cleaning' || s === 'move-out-cleaning');
+      const freqEl = form.querySelector<HTMLInputElement>('input[name="frequency"]:checked');
+      return {
+        locale: m.lang,
+        services,
+        homeType: data.get('homeType'),
+        bedrooms: data.get('bedrooms'),
+        bathrooms: data.get('bathrooms'),
+        frequency: standard && freqEl ? freqEl.value : null,
+        moveDate: move && data.get('moveDate') ? String(data.get('moveDate')) : null,
+        name: String(data.get('name') ?? '').trim(),
+        phone: String(data.get('phone') ?? '').trim(),
+        email: String(data.get('email') ?? '').trim(),
+        zip: String(data.get('zip') ?? '').trim(),
+        notes: String(data.get('notes') ?? '').trim(),
+        consent: form.querySelector<HTMLInputElement>('input[name="consent"]')?.checked === true,
+        website: String(data.get('website') ?? ''),
+        idempotencyKey,
+      };
+    };
+
+    const validate = (p: ReturnType<typeof collect>) => {
+      let ok = true;
+      setError('services', p.services.length === 0 ? (m.serviceRequired as string) : null);
+      setError('frequency', p.services.includes('standard-cleaning') && !p.frequency ? (m.frequencyRequired as string) : null);
+      setError('name', p.name === '' ? (m.required as string) : null);
+      setError('contact', p.phone === '' && p.email === '' ? (m.contactRequired as string) : null);
+      setError('consent', p.consent ? null : (m.consentRequired as string));
+      if (p.services.length === 0 || p.name === '' || (p.phone === '' && p.email === '') || !p.consent || (p.services.includes('standard-cleaning') && !p.frequency)) ok = false;
+      return ok;
+    };
+
+    const showStatus = (html: string, error = false) => {
+      statusBox.hidden = false;
+      statusBox.classList.toggle('status--error', error);
+      statusBox.innerHTML = html;
+    };
+
+    const unavailable = (payload: ReturnType<typeof collect>) => {
+      const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] ?? c);
+      const body = [
+        `<strong>${esc(m.unavailableTitle as string)}</strong>`,
+        `<p>${esc(m.unavailableBody as string)}</p>`,
+        '<div class="actions">',
+        `<button type="button" class="btn btn--primary" data-retry>${esc(m.tryAgain as string)}</button>`,
+        `<button type="button" class="btn btn--ghost" data-save>${esc(m.saveCopy as string)}</button>`,
+        m.emailAddress ? `<a class="btn btn--ghost" href="mailto:${esc(m.emailAddress as string)}?subject=${encodeURIComponent(m.emailSubject as string)}">${esc(m.emailUs as string)}</a>` : '',
+        '</div>',
+      ].join('');
+      showStatus(body, true);
+      statusBox.querySelector('[data-retry]')?.addEventListener('click', () => form.requestSubmit());
+      statusBox.querySelector('[data-save]')?.addEventListener('click', () => {
+        const lines = Object.entries(payload)
+          .filter(([k]) => k !== 'website' && k !== 'idempotencyKey')
+          .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v ?? ''}`);
+        const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = m.copyFileName as string;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+    };
+
+    form.addEventListener('input', () => {
+      const { website: _w, idempotencyKey: _k, ...rest } = collect();
+      void _w;
+      void _k;
+      writeDraft({ ...rest, photos: undefined });
+    });
+    form.addEventListener('change', () => {
+      const { website: _w, idempotencyKey: _k, ...rest } = collect();
+      void _w;
+      void _k;
+      writeDraft({ ...rest, photos: undefined });
+    });
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const payload = collect();
+      if (!validate(payload)) {
+        showStatus(`<strong>${m.fixErrors}</strong>`, true);
+        return;
+      }
+      if (!endpoint) {
+        unavailable(payload);
+        return;
+      }
+      submitBtn.disabled = true;
+      showStatus(`<strong>${m.sending}</strong>`);
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const result = (await response.json()) as { status: string; reference?: string };
+        if (result.status === 'received' && result.reference) {
+          try {
+            localStorage.removeItem(DRAFT_KEY);
+          } catch {
+            /* ignore */
+          }
+          window.location.href = `${window.location.pathname.replace(/request-estimate\/?$/, 'request-estimate/thanks/')}?ref=${encodeURIComponent(result.reference)}`;
+          return;
+        }
+        if (result.status === 'invalid') {
+          showStatus(`<strong>${m.fixErrors}</strong>`, true);
+        } else {
+          unavailable(payload);
+        }
+      } catch {
+        unavailable(payload);
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  }
+</script>

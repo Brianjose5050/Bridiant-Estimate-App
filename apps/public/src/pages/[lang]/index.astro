@@ -1,0 +1,107 @@
+---
+import Base from '../../layouts/Base.astro';
+import ServiceCard from '../../components/ServiceCard.astro';
+import Tag from '../../components/Tag.astro';
+import { LANGS, MODE, copyItem, href, pages, ready, services, servicesReady, text, ui, type Lang } from '../../lib/site';
+
+export function getStaticPaths() {
+  return LANGS.filter((lang) => ready(lang, ['home.headline', 'home.lead']) && servicesReady(lang)).map((lang) => ({ params: { lang } }));
+}
+
+type Step = { en: string; es: string; status: { en: string; es: string } };
+
+const { lang } = Astro.params as { lang: Lang };
+const headline = text('home.headline', lang) ?? '';
+const lead = text('home.lead', lang) ?? '';
+const howTitle = text('home.howTitle', lang);
+const steps = ((copyItem('home.steps') as unknown as Step[] | null) ?? []).filter(
+  (step) => MODE === 'preview' || step.status[lang] === 'approved',
+);
+const servicesIntro = text('servicesIntro', lang);
+const standardsIntro = text('standards.intro', lang);
+const welcomeIntro = text('welcome.intro', lang);
+---
+<Base lang={lang} title={`Bridiant Facility Group · ${ui('nav.home', lang)}`} description={lead || 'Bridiant Facility Group'} page={pages.home}>
+  <section class="section section--navy hero">
+    <div class="wrap">
+      {MODE === 'preview' && <Tag lang={lang} />}
+      <span class="eyebrow">{lang === 'en' ? 'Residential cleaning' : 'Limpieza residencial'}</span>
+      <h1>{headline}</h1>
+      <p class="lead">{lead}</p>
+      <div class="actions">
+        <a class="btn btn--primary" href={href(lang, pages.request)}>{ui('nav.requestEstimate', lang)}</a>
+        <a class="btn btn--ghost" href={href(lang, pages.services)}>{ui('nav.services', lang)}</a>
+      </div>
+      <ol class="index-row">
+        {services.map((service, i) => (
+          <li><span>{String(i + 1).padStart(2, '0')}</span>{service.name[lang]}</li>
+        ))}
+      </ol>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="head">
+        <span class="eyebrow">{ui('nav.services', lang)}</span>
+        {servicesIntro && <p class="lead">{servicesIntro}</p>}
+      </div>
+      <div class="grid grid--4">
+        {services.map((service) => <ServiceCard service={service} lang={lang} />)}
+      </div>
+    </div>
+  </section>
+
+  {howTitle && steps.length > 0 && (
+    <section class="section section--gray">
+      <div class="wrap">
+        <h2 style="margin-bottom:24px">{howTitle}</h2>
+        <div class="grid grid--3">
+          {steps.map((step, i) => (
+            <div class="step">
+              <span class="num">{String(i + 1).padStart(2, '0')}</span>
+              <p>{step[lang]}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )}
+
+  {standardsIntro && (
+    <section class="section">
+      <div class="wrap grid grid--2" style="align-items:center;gap:40px">
+        <div>
+          <span class="eyebrow">{ui('nav.standards', lang)}</span>
+          <h2>{ui('nav.standards', lang)}</h2>
+        </div>
+        <div class="stack">
+          <p class="lead">{standardsIntro}</p>
+          <a class="btn btn--ghost" href={href(lang, pages.standards)}>{ui('nav.standards', lang)} →</a>
+        </div>
+      </div>
+    </section>
+  )}
+
+  {welcomeIntro && (
+    <section class="section section--gray">
+      <div class="wrap grid grid--2" style="align-items:center;gap:40px">
+        <div>
+          <span class="eyebrow">{ui('nav.welcome', lang)}</span>
+          <h2>{ui('nav.welcome', lang)}</h2>
+        </div>
+        <div class="stack">
+          <p class="lead">{welcomeIntro}</p>
+          <a class="btn btn--ghost" href={href(lang, pages.welcome)}>{ui('nav.welcome', lang)} →</a>
+        </div>
+      </div>
+    </section>
+  )}
+
+  <section class="section section--navy">
+    <div class="wrap" style="display:grid;gap:24px;justify-items:start">
+      <h2>{ui('nav.requestEstimate', lang)}</h2>
+      <a class="btn btn--primary" href={href(lang, pages.request)}>{ui('nav.requestEstimate', lang)}</a>
+    </div>
+  </section>
+</Base>

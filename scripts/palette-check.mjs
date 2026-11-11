@@ -19,8 +19,8 @@ const ALLOWED_HEX = new Set(['#071a2b', '#ffffff', '#f1f3f5']);
 const ALLOWED_RGB_BASES = new Set(['7,26,43', '255,255,255', '241,243,245']);
 
 const SCAN_DIRS = ['packages', 'apps', 'content'];
-const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.css', '.html', '.svg', '.json']);
-const STYLE_EXTENSIONS = new Set(['.css', '.html', '.svg']);
+const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.css', '.html', '.svg', '.json', '.astro']);
+const STYLE_EXTENSIONS = new Set(['.css', '.html', '.svg', '.astro']);
 
 const OFF_BRAND_NAMES = [
   'gold', 'goldenrod', 'beige', 'tan', 'khaki', 'bisque', 'wheat',

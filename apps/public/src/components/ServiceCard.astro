@@ -1,0 +1,13 @@
+---
+import { href, type Lang, type Service, serviceSlugFor, ui } from '../lib/site';
+interface Props { service: Service; lang: Lang }
+const { service, lang } = Astro.props;
+const count = service.includedGroups.reduce((n, g) => n + g.items.length, 0);
+const path = `services/${serviceSlugFor(service, lang)}/`;
+---
+<a class="card" href={href(lang, path)}>
+  <span class="eyebrow" style="margin:0">{lang === 'en' ? `${count} included tasks` : `${count} tareas incluidas`}</span>
+  <h3>{service.name[lang]}</h3>
+  <p>{service.tagline[lang]}</p>
+  <span class="more">{lang === 'en' ? 'View included tasks' : 'Ver tareas incluidas'} →</span>
+</a>

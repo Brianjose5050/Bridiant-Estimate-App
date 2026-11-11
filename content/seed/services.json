@@ -1,82 +1,595 @@
 {
-  "_note": "Residential cleaning only. The four service names come from the owner's brief. Every description, task list, frequency, photo, and FAQ link is a placeholder until the owner supplies and approves it. Services stay hidden from the public site until approved.",
-  "schemaVersion": 1,
+  "_note": "Residential cleaning only. Content was extracted from owner-supplied checklists (see content/source/MANIFEST.md) and organized into service sections. Every item is status pending_approval (English) or draft (Spanish). Spanish drafts require a named reviewer before publishing. Nothing here is published until the owner approves it.",
+  "schemaVersion": 2,
   "sector": "residential",
+  "addOnsIntro": {
+    "en": "Available as add-ons. Just ask and we'll add it to your quote.",
+    "es": "Disponibles como complementos. Solo pregúntenos y lo añadimos a su cotización."
+  },
   "services": [
     {
       "slug": { "en": "standard-cleaning", "es": "limpieza-estandar" },
-      "name": {
-        "value": { "en": "Standard Cleaning", "es": "Limpieza estándar" },
-        "status": { "en": "pending_approval", "es": "draft" }
+      "name": { "en": "Standard Cleaning", "es": "Limpieza estándar" },
+      "tagline": {
+        "en": "What's included, no surprises, no fine print.",
+        "es": "Lo que incluye, sin sorpresas y sin letra pequeña."
       },
       "summary": {
-        "value": {
-          "en": "[OWNER TO PROVIDE: Standard Cleaning summary (EN)]",
-          "es": "[OWNER TO PROVIDE: Standard Cleaning summary (ES)]"
-        },
-        "status": { "en": "draft", "es": "draft" }
+        "en": "Standard Cleaning is our maintenance service, built to keep a home that's already in good shape looking that way, visit after visit. If it's been a while since a deep clean, or a few areas need more attention than regular upkeep, Deep Cleaning may be the better starting point.",
+        "es": "La limpieza estándar es nuestro servicio de mantenimiento, pensado para mantener una casa que ya está en buen estado, visita tras visita. Si hace tiempo que no se hace una limpieza profunda, o si algunas áreas necesitan más atención que el mantenimiento habitual, la limpieza profunda puede ser un mejor punto de partida."
       },
-      "includedTasks": { "value": { "en": [], "es": [] }, "note": "[OWNER TO PROVIDE: included tasks, EN and ES]" },
-      "excludedTasks": { "value": { "en": [], "es": [] }, "note": "[OWNER TO PROVIDE: excluded tasks, EN and ES]" },
-      "frequencies": { "value": [], "note": "[OWNER TO PROVIDE: frequencies offered]" },
-      "photos": [],
+      "note": null,
+      "sourceFile": "documents/en/included-standard-cleaning_EN.pdf",
+      "includedGroups": [
+        {
+          "title": { "en": "Kitchen", "es": "Cocina" },
+          "items": [
+            { "en": "Countertops & table", "es": "Encimeras y mesa" },
+            { "en": "All visible flat surfaces", "es": "Todas las superficies planas visibles" },
+            { "en": "Exterior of all appliances", "es": "Exterior de todos los electrodomésticos" },
+            { "en": "Appliance doors & handles", "es": "Puertas y manijas de electrodomésticos" },
+            { "en": "Sink & faucet", "es": "Fregadero y grifo" },
+            { "en": "Normal splatters wiped down", "es": "Salpicaduras habituales limpiadas" },
+            { "en": "Interior of microwave", "es": "Interior del microondas" },
+            { "en": "Floors, vacuumed or swept", "es": "Pisos aspirados o barridos" },
+            { "en": "Floors, mopped", "es": "Pisos trapeados" },
+            { "en": "Trash removed", "es": "Basura retirada" }
+          ]
+        },
+        {
+          "title": { "en": "Bathrooms", "es": "Baños" },
+          "items": [
+            { "en": "Toilet, interior & exterior", "es": "Inodoro, interior y exterior" },
+            { "en": "Toilet base", "es": "Base del inodoro" },
+            { "en": "Shower & tub", "es": "Ducha y bañera" },
+            { "en": "Sink, faucet & countertop", "es": "Lavabo, grifo y encimera" },
+            { "en": "Mirror, streak-free", "es": "Espejo, sin marcas" },
+            { "en": "All visible surfaces", "es": "Todas las superficies visibles" },
+            { "en": "Floors, vacuumed or swept", "es": "Pisos aspirados o barridos" },
+            { "en": "Floors, mopped", "es": "Pisos trapeados" },
+            { "en": "Trash removed", "es": "Basura retirada" }
+          ]
+        },
+        {
+          "title": { "en": "Bedrooms", "es": "Dormitorios" },
+          "items": [
+            { "en": "Dusting of all visible surfaces", "es": "Desempolvado de todas las superficies visibles" },
+            { "en": "Nightstands & dressers", "es": "Mesitas de noche y cómodas" },
+            { "en": "Shelves & accessible furniture", "es": "Estantes y muebles accesibles" },
+            { "en": "Full carpet vacuuming", "es": "Aspirado completo de alfombras" },
+            { "en": "Hard floors, vacuumed & mopped", "es": "Pisos duros, aspirados y trapeados" },
+            { "en": "Trash removed", "es": "Basura retirada" }
+          ]
+        },
+        {
+          "title": { "en": "Living areas", "es": "Áreas de estar" },
+          "items": [
+            { "en": "Tables, coffee & side tables", "es": "Mesas, mesas de centro y auxiliares" },
+            { "en": "Shelves & accessible furniture", "es": "Estantes y muebles accesibles" },
+            { "en": "All visible flat surfaces", "es": "Todas las superficies planas visibles" },
+            { "en": "Vacuuming, wall to wall", "es": "Aspirado de pared a pared" },
+            { "en": "Mopping of hard floors", "es": "Trapeado de pisos duros" },
+            { "en": "Trash removed", "es": "Basura retirada" }
+          ]
+        },
+        {
+          "title": { "en": "Hallways & stairs", "es": "Pasillos y escaleras" },
+          "items": [
+            { "en": "Vacuuming", "es": "Aspirado" },
+            { "en": "Mopping of hard floors", "es": "Trapeado de pisos duros" },
+            { "en": "Dusting of accessible surfaces", "es": "Desempolvado de superficies accesibles" },
+            { "en": "Stair treads vacuumed", "es": "Escalones aspirados" },
+            { "en": "Handrails wiped", "es": "Pasamanos limpiados" },
+            { "en": "Visible cobweb removal", "es": "Retiro de telarañas visibles" }
+          ]
+        },
+        {
+          "title": { "en": "Whole home", "es": "Toda la casa" },
+          "items": [
+            { "en": "Dusting of visible & accessible surfaces", "es": "Desempolvado de superficies visibles y accesibles" },
+            { "en": "Vacuuming of floors", "es": "Aspirado de pisos" },
+            { "en": "Mopping of hard floors", "es": "Trapeado de pisos duros" },
+            { "en": "Trash removal throughout", "es": "Retiro de basura en toda la casa" },
+            { "en": "Cobweb removal, readily accessible areas", "es": "Retiro de telarañas en áreas de fácil acceso" },
+            { "en": "Spot wipe-downs of visible surfaces throughout", "es": "Limpieza puntual de superficies visibles en toda la casa" }
+          ]
+        }
+      ],
+      "addOns": [
+        { "en": "Inside Refrigerator Cleaning", "es": "Limpieza interior del refrigerador" },
+        { "en": "Inside Oven Cleaning", "es": "Limpieza interior del horno" },
+        { "en": "Inside Cabinets Cleaning", "es": "Limpieza interior de gabinetes" },
+        { "en": "Interior Wall Spot Cleaning", "es": "Limpieza puntual de paredes interiores" },
+        { "en": "Heavy Pet Hair Removal", "es": "Retiro intenso de pelo de mascotas" },
+        { "en": "Garage Sweep & Basic Cleaning", "es": "Barrido de garaje y limpieza básica" },
+        { "en": "Patio / Lanai Cleaning", "es": "Limpieza de patio / lanai" },
+        { "en": "Laundry Service", "es": "Servicio de lavandería" },
+        { "en": "Interior Windows", "es": "Ventanas interiores" },
+        { "en": "Closet Organization", "es": "Organización de closets" },
+        { "en": "Detailed Baseboard Cleaning", "es": "Limpieza detallada de zócalos" },
+        { "en": "Dishwasher Interior Cleaning", "es": "Limpieza interior del lavaplatos" },
+        { "en": "Interior Blinds Cleaning", "es": "Limpieza de persianas interiores" },
+        { "en": "Heavy Limescale / Mineral & Soap-Scum Buildup", "es": "Remoción intensa de sarro, minerales y residuo de jabón" },
+        { "en": "Dishwashing Service", "es": "Servicio de lavado de platos" }
+      ],
+      "status": { "en": "pending_approval", "es": "draft" },
       "visible": false
     },
     {
       "slug": { "en": "deep-cleaning", "es": "limpieza-profunda" },
-      "name": {
-        "value": { "en": "Deep Cleaning", "es": "Limpieza profunda" },
-        "status": { "en": "pending_approval", "es": "draft" }
+      "name": { "en": "Deep Cleaning", "es": "Limpieza profunda" },
+      "tagline": {
+        "en": "The reset: every detail Standard doesn't reach.",
+        "es": "El reinicio: cada detalle que la limpieza estándar no alcanza."
       },
       "summary": {
-        "value": {
-          "en": "[OWNER TO PROVIDE: Deep Cleaning summary (EN)]",
-          "es": "[OWNER TO PROVIDE: Deep Cleaning summary (ES)]"
-        },
-        "status": { "en": "draft", "es": "draft" }
+        "en": "Deep Cleaning goes further than routine maintenance. It reaches the details that regular upkeep leaves for later, room by room.",
+        "es": "La limpieza profunda va más allá del mantenimiento habitual. Llega a los detalles que el mantenimiento regular deja para después, habitación por habitación."
       },
-      "includedTasks": { "value": { "en": [], "es": [] }, "note": "[OWNER TO PROVIDE: included tasks, EN and ES]" },
-      "excludedTasks": { "value": { "en": [], "es": [] }, "note": "[OWNER TO PROVIDE: excluded tasks, EN and ES]" },
-      "frequencies": { "value": [], "note": "[OWNER TO PROVIDE: frequencies offered]" },
-      "photos": [],
+      "note": {
+        "en": "Deep Cleaning goes further than routine maintenance, but results still depend on your home's current condition. It is not a restoration service for permanently worn or damaged surfaces.",
+        "es": "La limpieza profunda va más allá del mantenimiento habitual, pero los resultados dependen del estado actual de su hogar. No es un servicio de restauración para superficies permanentemente desgastadas o dañadas."
+      },
+      "sourceFile": "documents/en/included-deep-cleaning_EN.pdf",
+      "includedGroups": [
+        {
+          "title": { "en": "Kitchen", "es": "Cocina" },
+          "items": [
+            { "en": "Countertops & backsplash", "es": "Encimeras y salpicadero" },
+            { "en": "Kitchen table & all visible surfaces", "es": "Mesa de cocina y todas las superficies visibles" },
+            { "en": "Sink & faucet", "es": "Fregadero y grifo" },
+            { "en": "Exterior of all appliances", "es": "Exterior de todos los electrodomésticos" },
+            { "en": "Appliance handles", "es": "Manijas de electrodomésticos" },
+            { "en": "Stovetop, detailed", "es": "Estufa, limpieza detallada" },
+            { "en": "Normal to moderate grease & splatters", "es": "Grasa y salpicaduras normales a moderadas" },
+            { "en": "Interior of microwave", "es": "Interior del microondas" },
+            { "en": "Exterior of cabinets & handles", "es": "Exterior de gabinetes y manijas" },
+            { "en": "Baseboards, door frames & switches", "es": "Zócalos, marcos de puertas e interruptores" },
+            { "en": "Vents & ceiling fan", "es": "Rejillas y ventilador de techo" },
+            { "en": "Floor edges", "es": "Bordes del piso" },
+            { "en": "Floors, vacuumed or swept", "es": "Pisos aspirados o barridos" },
+            { "en": "Floors, mopped", "es": "Pisos trapeados" },
+            { "en": "Behind & underneath accessible furniture", "es": "Detrás y debajo de muebles accesibles" }
+          ]
+        },
+        {
+          "title": { "en": "Bathrooms", "es": "Baños" },
+          "items": [
+            { "en": "Toilet, full detail: interior, exterior & base", "es": "Inodoro, limpieza completa: interior, exterior y base" },
+            { "en": "Area surrounding the toilet", "es": "Área alrededor del inodoro" },
+            { "en": "Sink, faucet & countertop / vanity", "es": "Lavabo, grifo y encimera / mueble" },
+            { "en": "Shower & tub, walls & fixtures", "es": "Ducha y bañera, paredes y accesorios" },
+            { "en": "Shower glass door & accessible tracks", "es": "Puerta de vidrio de la ducha y rieles accesibles" },
+            { "en": "Mirror", "es": "Espejo" },
+            { "en": "Grout & caulking, detailed", "es": "Lechada y sellador, limpieza detallada" },
+            { "en": "Normal soap residue & water spots", "es": "Residuo de jabón normal y manchas de agua" },
+            { "en": "Baseboards, door frames & switches", "es": "Zócalos, marcos de puertas e interruptores" },
+            { "en": "Exhaust vent & corners", "es": "Rejilla de extracción y esquinas" },
+            { "en": "Floor edges", "es": "Bordes del piso" },
+            { "en": "Floors, vacuumed or swept", "es": "Pisos aspirados o barridos" },
+            { "en": "Floors, mopped", "es": "Pisos trapeados" }
+          ]
+        },
+        {
+          "title": { "en": "Living areas", "es": "Áreas de estar" },
+          "items": [
+            { "en": "Full dusting of tables & shelves", "es": "Desempolvado completo de mesas y estantes" },
+            { "en": "Accessible furniture surfaces", "es": "Superficies de muebles accesibles" },
+            { "en": "Accessible picture frames", "es": "Marcos de cuadros accesibles" },
+            { "en": "Baseboards & door frames", "es": "Zócalos y marcos de puertas" },
+            { "en": "Visible marks on doors", "es": "Marcas visibles en puertas" },
+            { "en": "Switches & outlet covers", "es": "Interruptores y tapas de enchufes" },
+            { "en": "Ceiling fans & accessible light fixtures", "es": "Ventiladores de techo y luminarias accesibles" },
+            { "en": "Vents", "es": "Rejillas" },
+            { "en": "Cobwebs", "es": "Telarañas" },
+            { "en": "Window sills & accessible tracks", "es": "Repisas de ventana y rieles accesibles" },
+            { "en": "Floor edges", "es": "Bordes del piso" },
+            { "en": "Full vacuuming", "es": "Aspirado completo" },
+            { "en": "Mopping of hard floors", "es": "Trapeado de pisos duros" },
+            { "en": "Behind & underneath accessible furniture", "es": "Detrás y debajo de muebles accesibles" }
+          ]
+        },
+        {
+          "title": { "en": "Bedrooms", "es": "Dormitorios" },
+          "items": [
+            { "en": "Full dusting of nightstands & dressers", "es": "Desempolvado completo de mesitas de noche y cómodas" },
+            { "en": "Shelves & accessible furniture", "es": "Estantes y muebles accesibles" },
+            { "en": "Accessible picture frames", "es": "Marcos de cuadros accesibles" },
+            { "en": "Baseboards, door frames & doors", "es": "Zócalos, marcos y puertas" },
+            { "en": "Switches & outlet covers", "es": "Interruptores y tapas de enchufes" },
+            { "en": "Ceiling fans & accessible light fixtures", "es": "Ventiladores de techo y luminarias accesibles" },
+            { "en": "Vents & cobwebs", "es": "Rejillas y telarañas" },
+            { "en": "Window sills & accessible tracks", "es": "Repisas de ventana y rieles accesibles" },
+            { "en": "Floor edges", "es": "Bordes del piso" },
+            { "en": "Full carpet vacuuming", "es": "Aspirado completo de alfombras" },
+            { "en": "Hard floors, vacuumed & mopped", "es": "Pisos duros, aspirados y trapeados" },
+            { "en": "Behind & underneath accessible furniture", "es": "Detrás y debajo de muebles accesibles" }
+          ]
+        },
+        {
+          "title": { "en": "Hallways, entry & stairs", "es": "Pasillos, entrada y escaleras" },
+          "items": [
+            { "en": "Dusting of accessible surfaces", "es": "Desempolvado de superficies accesibles" },
+            { "en": "Baseboards & door frames", "es": "Zócalos y marcos de puertas" },
+            { "en": "Doors & switches", "es": "Puertas e interruptores" },
+            { "en": "Vents & cobwebs", "es": "Rejillas y telarañas" },
+            { "en": "Accessible window sills", "es": "Repisas de ventana accesibles" },
+            { "en": "Vacuuming & floor edges", "es": "Aspirado y bordes del piso" },
+            { "en": "Mopping of hard floors", "es": "Trapeado de pisos duros" },
+            { "en": "Stairs, vacuumed", "es": "Escaleras aspiradas" },
+            { "en": "Handrails, wiped", "es": "Pasamanos limpiados" }
+          ]
+        },
+        {
+          "title": { "en": "Windows", "es": "Ventanas" },
+          "items": [
+            { "en": "Window sills", "es": "Repisas de ventana" },
+            { "en": "Window ledges", "es": "Salientes de ventana" },
+            { "en": "Accessible window tracks", "es": "Rieles de ventana accesibles" },
+            { "en": "Visible dust or dirt around the window", "es": "Polvo o suciedad visible alrededor de la ventana" }
+          ]
+        },
+        {
+          "title": { "en": "Laundry room", "es": "Cuarto de lavado" },
+          "items": [
+            { "en": "Exterior of washer & dryer", "es": "Exterior de lavadora y secadora" },
+            { "en": "Accessible surfaces", "es": "Superficies accesibles" },
+            { "en": "Baseboards & door frames", "es": "Zócalos y marcos de puertas" },
+            { "en": "Switches, vents & cobwebs", "es": "Interruptores, rejillas y telarañas" },
+            { "en": "Floor, vacuumed & mopped", "es": "Piso aspirado y trapeado" }
+          ]
+        },
+        {
+          "title": { "en": "Whole home: finishing touches", "es": "Toda la casa: toques finales" },
+          "items": [
+            { "en": "Trash removed throughout", "es": "Basura retirada en toda la casa" },
+            { "en": "Liners replaced where needed", "es": "Bolsas de basura reemplazadas donde sea necesario" },
+            { "en": "Full vacuuming throughout", "es": "Aspirado completo en toda la casa" },
+            { "en": "Full mopping throughout", "es": "Trapeado completo en toda la casa" },
+            { "en": "Final visual walkthrough", "es": "Recorrido visual final" }
+          ]
+        }
+      ],
+      "addOns": [
+        { "en": "Inside Refrigerator Cleaning", "es": "Limpieza interior del refrigerador" },
+        { "en": "Inside Oven Cleaning", "es": "Limpieza interior del horno" },
+        { "en": "Inside Cabinets Cleaning", "es": "Limpieza interior de gabinetes" },
+        { "en": "Interior Wall Spot Cleaning", "es": "Limpieza puntual de paredes interiores" },
+        { "en": "Heavy Pet Hair Removal", "es": "Retiro intenso de pelo de mascotas" },
+        { "en": "Garage Sweep & Basic Cleaning", "es": "Barrido de garaje y limpieza básica" },
+        { "en": "Patio / Lanai Cleaning", "es": "Limpieza de patio / lanai" },
+        { "en": "Laundry Service", "es": "Servicio de lavandería" },
+        { "en": "Interior Windows", "es": "Ventanas interiores" },
+        { "en": "Closet Organization", "es": "Organización de closets" },
+        { "en": "Detailed Baseboard Cleaning", "es": "Limpieza detallada de zócalos" },
+        { "en": "Dishwasher Interior Cleaning", "es": "Limpieza interior del lavaplatos" },
+        { "en": "Interior Blinds Cleaning", "es": "Limpieza de persianas interiores" },
+        { "en": "Heavy Limescale / Mineral & Soap-Scum Buildup", "es": "Remoción intensa de sarro, minerales y residuo de jabón" },
+        { "en": "Dishwashing Service", "es": "Servicio de lavado de platos" }
+      ],
+      "status": { "en": "pending_approval", "es": "draft" },
       "visible": false
     },
     {
-      "slug": { "en": "move-in-cleaning", "es": "limpieza-de-mudanza-entrada" },
-      "name": {
-        "value": { "en": "Move-In Cleaning", "es": "Limpieza de entrada" },
-        "status": { "en": "pending_approval", "es": "draft" }
+      "slug": { "en": "move-in-cleaning", "es": "limpieza-de-entrada" },
+      "name": { "en": "Move-In Cleaning", "es": "Limpieza de entrada" },
+      "tagline": {
+        "en": "Every space, ready before you unpack.",
+        "es": "Cada espacio, listo antes de desempacar."
       },
       "summary": {
-        "value": {
-          "en": "[OWNER TO PROVIDE: Move-In Cleaning summary (EN)]",
-          "es": "[OWNER TO PROVIDE: Move-In Cleaning summary (ES)]"
-        },
-        "status": { "en": "draft", "es": "draft" }
+        "en": "Move-In Cleaning prepares a home before you arrive. Cabinets, drawers, closets, and corners are cleaned while they are empty.",
+        "es": "La limpieza de entrada prepara la casa antes de que llegue. Gabinetes, cajones, closets y esquinas se limpian mientras están vacíos."
       },
-      "includedTasks": { "value": { "en": [], "es": [] }, "note": "[OWNER TO PROVIDE: included tasks, EN and ES]" },
-      "excludedTasks": { "value": { "en": [], "es": [] }, "note": "[OWNER TO PROVIDE: excluded tasks, EN and ES]" },
-      "frequencies": { "value": [], "note": "[OWNER TO PROVIDE: frequencies offered]" },
-      "photos": [],
+      "note": {
+        "en": "Move-In Cleaning takes full advantage of the empty home to reach cabinets, closets, and corners, but it's still cleaning, not restoration. Results depend on the property's current condition, material, and age.",
+        "es": "La limpieza de entrada aprovecha la casa vacía para llegar a gabinetes, closets y esquinas, pero sigue siendo limpieza, no restauración. Los resultados dependen del estado actual, el material y la antigüedad de la propiedad."
+      },
+      "sourceFile": "documents/en/included-move-in-cleaning_EN.pdf",
+      "includedGroups": [
+        {
+          "title": { "en": "Kitchen", "es": "Cocina" },
+          "items": [
+            { "en": "Countertops & backsplash", "es": "Encimeras y salpicadero" },
+            { "en": "Kitchen table & all visible surfaces", "es": "Mesa de cocina y todas las superficies visibles" },
+            { "en": "Sink & faucet", "es": "Fregadero y grifo" },
+            { "en": "Stovetop", "es": "Estufa" },
+            { "en": "Exterior of all appliances", "es": "Exterior de todos los electrodomésticos" },
+            { "en": "Appliance doors & handles", "es": "Puertas y manijas de electrodomésticos" },
+            { "en": "Interior of microwave", "es": "Interior del microondas" },
+            { "en": "Interior & exterior of empty cabinets", "es": "Interior y exterior de gabinetes vacíos" },
+            { "en": "Interior & exterior of empty drawers", "es": "Interior y exterior de cajones vacíos" },
+            { "en": "Cabinet handles, knobs & pulls", "es": "Manijas, perillas y tiradores de gabinetes" },
+            { "en": "Interior of empty pantry", "es": "Interior de la despensa vacía" },
+            { "en": "Baseboards, door frames & doors", "es": "Zócalos, marcos y puertas" },
+            { "en": "Switches", "es": "Interruptores" },
+            { "en": "Vents & ceiling fan", "es": "Rejillas y ventilador de techo" },
+            { "en": "Behind & underneath accessible appliances", "es": "Detrás y debajo de electrodomésticos accesibles" },
+            { "en": "Floor edges", "es": "Bordes del piso" },
+            { "en": "Floors, vacuumed or swept", "es": "Pisos aspirados o barridos" },
+            { "en": "Floors, mopped", "es": "Pisos trapeados" },
+            { "en": "Trash removed", "es": "Basura retirada" }
+          ]
+        },
+        {
+          "title": { "en": "Bathrooms", "es": "Baños" },
+          "items": [
+            { "en": "Toilet: interior, exterior & base", "es": "Inodoro: interior, exterior y base" },
+            { "en": "Area surrounding the toilet", "es": "Área alrededor del inodoro" },
+            { "en": "Sink, faucet & countertop / vanity", "es": "Lavabo, grifo y encimera / mueble" },
+            { "en": "Shower & tub, walls & fixtures", "es": "Ducha y bañera, paredes y accesorios" },
+            { "en": "Shower glass door & accessible tracks", "es": "Puerta de vidrio de la ducha y rieles accesibles" },
+            { "en": "Mirror", "es": "Espejo" },
+            { "en": "Grout & caulking", "es": "Lechada y sellador" },
+            { "en": "Normal soap residue", "es": "Residuo de jabón normal" },
+            { "en": "Interior of empty vanity cabinets", "es": "Interior de gabinetes del mueble vacíos" },
+            { "en": "Interior of empty drawers", "es": "Interior de cajones vacíos" },
+            { "en": "Baseboards, door frames & doors", "es": "Zócalos, marcos y puertas" },
+            { "en": "Switches & exhaust vent", "es": "Interruptores y rejilla de extracción" },
+            { "en": "Corners", "es": "Esquinas" },
+            { "en": "Floor edges", "es": "Bordes del piso" },
+            { "en": "Floors, vacuumed or swept", "es": "Pisos aspirados o barridos" },
+            { "en": "Floors, mopped", "es": "Pisos trapeados" },
+            { "en": "Trash removed", "es": "Basura retirada" }
+          ]
+        },
+        {
+          "title": { "en": "Bedrooms", "es": "Dormitorios" },
+          "items": [
+            { "en": "Full dusting of accessible surfaces", "es": "Desempolvado completo de superficies accesibles" },
+            { "en": "Nightstands & dressers", "es": "Mesitas de noche y cómodas" },
+            { "en": "Shelves & accessible furniture", "es": "Estantes y muebles accesibles" },
+            { "en": "Baseboards, door frames & doors", "es": "Zócalos, marcos y puertas" },
+            { "en": "Switches & outlet covers", "es": "Interruptores y tapas de enchufes" },
+            { "en": "Ceiling fans & accessible light fixtures", "es": "Ventiladores de techo y luminarias accesibles" },
+            { "en": "Vents & cobwebs", "es": "Rejillas y telarañas" },
+            { "en": "Window sills, ledges & accessible tracks", "es": "Repisas, salientes y rieles accesibles" },
+            { "en": "Closets, completely empty: shelves & rods", "es": "Closets completamente vacíos: estantes y barras" },
+            { "en": "Closet floor & corners", "es": "Piso y esquinas del closet" },
+            { "en": "Closet door tracks & hardware", "es": "Rieles y herrajes de puertas de closet" },
+            { "en": "Full carpet vacuuming", "es": "Aspirado completo de alfombras" },
+            { "en": "Hard floors, vacuumed & mopped", "es": "Pisos duros, aspirados y trapeados" },
+            { "en": "Floor edges", "es": "Bordes del piso" },
+            { "en": "Trash removed", "es": "Basura retirada" }
+          ]
+        },
+        {
+          "title": { "en": "Living areas", "es": "Áreas de estar" },
+          "items": [
+            { "en": "Full dusting: tables, coffee & side tables", "es": "Desempolvado completo: mesas, mesas de centro y auxiliares" },
+            { "en": "Shelves & accessible furniture", "es": "Estantes y muebles accesibles" },
+            { "en": "Accessible picture frames", "es": "Marcos de cuadros accesibles" },
+            { "en": "Baseboards, door frames, doors & handles", "es": "Zócalos, marcos, puertas y manijas" },
+            { "en": "Switches & outlet covers", "es": "Interruptores y tapas de enchufes" },
+            { "en": "Ceiling fans & accessible light fixtures", "es": "Ventiladores de techo y luminarias accesibles" },
+            { "en": "Vents & cobwebs", "es": "Rejillas y telarañas" },
+            { "en": "Window sills, ledges & accessible tracks", "es": "Repisas, salientes y rieles accesibles" },
+            { "en": "Floor edges", "es": "Bordes del piso" },
+            { "en": "Full vacuuming", "es": "Aspirado completo" },
+            { "en": "Mopping of hard floors", "es": "Trapeado de pisos duros" },
+            { "en": "Trash removed", "es": "Basura retirada" }
+          ]
+        },
+        {
+          "title": { "en": "Hallways, entry & stairs", "es": "Pasillos, entrada y escaleras" },
+          "items": [
+            { "en": "Dusting of accessible surfaces", "es": "Desempolvado de superficies accesibles" },
+            { "en": "Baseboards, door frames, doors & handles", "es": "Zócalos, marcos, puertas y manijas" },
+            { "en": "Switches & vents", "es": "Interruptores y rejillas" },
+            { "en": "Cobwebs", "es": "Telarañas" },
+            { "en": "Accessible window sills", "es": "Repisas de ventana accesibles" },
+            { "en": "Vacuuming & floor edges", "es": "Aspirado y bordes del piso" },
+            { "en": "Mopping of hard floors", "es": "Trapeado de pisos duros" },
+            { "en": "Stairs, vacuumed", "es": "Escaleras aspiradas" },
+            { "en": "Handrails, wiped", "es": "Pasamanos limpiados" }
+          ]
+        },
+        {
+          "title": { "en": "Windows", "es": "Ventanas" },
+          "items": [
+            { "en": "Window sills & ledges", "es": "Repisas y salientes de ventana" },
+            { "en": "Accessible window tracks", "es": "Rieles de ventana accesibles" },
+            { "en": "Visible dust around windows", "es": "Polvo visible alrededor de las ventanas" }
+          ]
+        },
+        {
+          "title": { "en": "Laundry room", "es": "Cuarto de lavado" },
+          "items": [
+            { "en": "Exterior of washer & dryer", "es": "Exterior de lavadora y secadora" },
+            { "en": "Accessible surfaces", "es": "Superficies accesibles" },
+            { "en": "Baseboards, frames & doors", "es": "Zócalos, marcos y puertas" },
+            { "en": "Switches & vents", "es": "Interruptores y rejillas" },
+            { "en": "Cobwebs", "es": "Telarañas" },
+            { "en": "Floor, vacuumed & mopped", "es": "Piso aspirado y trapeado" }
+          ]
+        },
+        {
+          "title": { "en": "Whole home", "es": "Toda la casa" },
+          "items": [
+            { "en": "Full vacuuming & mopping throughout", "es": "Aspirado y trapeado completos en toda la casa" },
+            { "en": "Trash removed, liners replaced", "es": "Basura retirada, bolsas reemplazadas" },
+            { "en": "Accessible cobwebs & corners", "es": "Telarañas y esquinas accesibles" },
+            { "en": "Final visual walkthrough", "es": "Recorrido visual final" },
+            { "en": "Light freshening pass so the home feels move-in ready", "es": "Pasada de frescura ligera para que la casa esté lista para mudarse" }
+          ]
+        }
+      ],
+      "addOns": [
+        { "en": "Inside Refrigerator Cleaning", "es": "Limpieza interior del refrigerador" },
+        { "en": "Inside Oven Cleaning", "es": "Limpieza interior del horno" },
+        { "en": "Interior Wall Spot Cleaning", "es": "Limpieza puntual de paredes interiores" },
+        { "en": "Heavy Pet Hair Removal", "es": "Retiro intenso de pelo de mascotas" },
+        { "en": "Garage Sweep & Basic Cleaning", "es": "Barrido de garaje y limpieza básica" },
+        { "en": "Patio / Lanai Cleaning", "es": "Limpieza de patio / lanai" },
+        { "en": "Laundry Service", "es": "Servicio de lavandería" },
+        { "en": "Interior Windows", "es": "Ventanas interiores" },
+        { "en": "Closet Organization", "es": "Organización de closets" },
+        { "en": "Detailed Baseboard Cleaning", "es": "Limpieza detallada de zócalos" },
+        { "en": "Dishwasher Interior Cleaning", "es": "Limpieza interior del lavaplatos" },
+        { "en": "Interior Blinds Cleaning", "es": "Limpieza de persianas interiores" },
+        { "en": "Heavy Limescale / Mineral & Soap-Scum Buildup", "es": "Remoción intensa de sarro, minerales y residuo de jabón" },
+        { "en": "Dishwashing Service", "es": "Servicio de lavado de platos" }
+      ],
+      "status": { "en": "pending_approval", "es": "draft" },
       "visible": false
     },
     {
-      "slug": { "en": "move-out-cleaning", "es": "limpieza-de-mudanza-salida" },
-      "name": {
-        "value": { "en": "Move-Out Cleaning", "es": "Limpieza de salida" },
-        "status": { "en": "pending_approval", "es": "draft" }
+      "slug": { "en": "move-out-cleaning", "es": "limpieza-de-salida" },
+      "name": { "en": "Move-Out Cleaning", "es": "Limpieza de salida" },
+      "tagline": {
+        "en": "Left the way it should be. Ready for what's next.",
+        "es": "Dejado como debe estar. Listo para lo que sigue."
       },
       "summary": {
-        "value": {
-          "en": "[OWNER TO PROVIDE: Move-Out Cleaning summary (EN)]",
-          "es": "[OWNER TO PROVIDE: Move-Out Cleaning summary (ES)]"
-        },
-        "status": { "en": "draft", "es": "draft" }
+        "en": "Move-Out Cleaning leaves the property clean and presentable for whatever comes next.",
+        "es": "La limpieza de salida deja la propiedad limpia y presentable para lo que sigue."
       },
-      "includedTasks": { "value": { "en": [], "es": [] }, "note": "[OWNER TO PROVIDE: included tasks, EN and ES]" },
-      "excludedTasks": { "value": { "en": [], "es": [] }, "note": "[OWNER TO PROVIDE: excluded tasks, EN and ES]" },
-      "frequencies": { "value": [], "note": "[OWNER TO PROVIDE: frequencies offered]" },
-      "photos": [],
+      "note": {
+        "en": "We can't guarantee your landlord's inspection results or deposit decision, since that's outside our control. We will make sure the cleaning itself is thorough.",
+        "es": "No podemos garantizar los resultados de la inspección de su arrendador ni la decisión sobre el depósito, ya que eso está fuera de nuestro control. Sí nos aseguramos de que la limpieza sea minuciosa."
+      },
+      "sourceFile": "documents/en/included-move-out-cleaning_EN_checklist-image.png",
+      "sourceNote": "Transcribed from an image of the checklist. The source image says 'Slovetop'; this is recorded as 'Stovetop'. Owner to confirm the list and the disclaimer wording.",
+      "includedGroups": [
+        {
+          "title": { "en": "Kitchen", "es": "Cocina" },
+          "items": [
+            { "en": "Countertops & backsplash", "es": "Encimeras y salpicadero" },
+            { "en": "Kitchen table & visible surfaces", "es": "Mesa de cocina y superficies visibles" },
+            { "en": "Sink & faucet", "es": "Fregadero y grifo" },
+            { "en": "Exterior of all appliances", "es": "Exterior de todos los electrodomésticos" },
+            { "en": "Appliance doors & handles", "es": "Puertas y manijas de electrodomésticos" },
+            { "en": "Stovetop", "es": "Estufa" },
+            { "en": "Normal splatters & everyday dirt", "es": "Salpicaduras y suciedad diaria normal" },
+            { "en": "Interior of microwave", "es": "Interior del microondas" },
+            { "en": "Exterior of cabinets", "es": "Exterior de gabinetes" },
+            { "en": "Interior of empty cabinets", "es": "Interior de gabinetes vacíos" },
+            { "en": "Handles & pulls", "es": "Manijas y tiradores" },
+            { "en": "Interior of empty drawers", "es": "Interior de cajones vacíos" },
+            { "en": "Baseboards, door frames & doors", "es": "Zócalos, marcos y puertas" },
+            { "en": "Switches", "es": "Interruptores" },
+            { "en": "Vents & ceiling fan", "es": "Rejillas y ventilador de techo" },
+            { "en": "Cobwebs", "es": "Telarañas" },
+            { "en": "Floor edges", "es": "Bordes del piso" },
+            { "en": "Floors, vacuumed or swept", "es": "Pisos aspirados o barridos" },
+            { "en": "Floors, mopped", "es": "Pisos trapeados" },
+            { "en": "Trash removed", "es": "Basura retirada" },
+            { "en": "Interior of empty cabinets & drawers", "es": "Interior de gabinetes y cajones vacíos" },
+            { "en": "Interior of empty refrigerator", "es": "Interior del refrigerador vacío" }
+          ]
+        },
+        {
+          "title": { "en": "Bedrooms", "es": "Dormitorios" },
+          "items": [
+            { "en": "Dusting of visible surfaces", "es": "Desempolvado de superficies visibles" },
+            { "en": "Nightstands & dressers", "es": "Mesitas de noche y cómodas" },
+            { "en": "Shelves & accessible furniture", "es": "Estantes y muebles accesibles" },
+            { "en": "Baseboards, door frames & doors", "es": "Zócalos, marcos y puertas" },
+            { "en": "Switches & outlet covers", "es": "Interruptores y tapas de enchufes" },
+            { "en": "Ceiling fans & accessible light fixtures", "es": "Ventiladores de techo y luminarias accesibles" },
+            { "en": "Vents & cobwebs", "es": "Rejillas y telarañas" },
+            { "en": "Window sills, ledges & accessible tracks", "es": "Repisas, salientes y rieles accesibles" },
+            { "en": "Closets, completely empty: shelves & rods", "es": "Closets completamente vacíos: estantes y barras" },
+            { "en": "Closet floor & corners", "es": "Piso y esquinas del closet" },
+            { "en": "Full carpet vacuuming", "es": "Aspirado completo de alfombras" },
+            { "en": "Hard floors, vacuumed & mopped", "es": "Pisos duros, aspirados y trapeados" },
+            { "en": "Floor edges", "es": "Bordes del piso" },
+            { "en": "Trash removed", "es": "Basura retirada" },
+            { "en": "Closet door tracks & hardware", "es": "Rieles y herrajes de puertas de closet" }
+          ]
+        },
+        {
+          "title": { "en": "Hallways, entry & stairs", "es": "Pasillos, entrada y escaleras" },
+          "items": [
+            { "en": "Dusting of accessible surfaces", "es": "Desempolvado de superficies accesibles" },
+            { "en": "Baseboards, door frames, doors & handles", "es": "Zócalos, marcos, puertas y manijas" },
+            { "en": "Switches & vents", "es": "Interruptores y rejillas" },
+            { "en": "Cobwebs", "es": "Telarañas" },
+            { "en": "Accessible window sills", "es": "Repisas de ventana accesibles" },
+            { "en": "Vacuuming & floor edges", "es": "Aspirado y bordes del piso" },
+            { "en": "Mopping of hard floors", "es": "Trapeado de pisos duros" },
+            { "en": "Stairs, vacuumed", "es": "Escaleras aspiradas" },
+            { "en": "Handrails, wiped", "es": "Pasamanos limpiados" },
+            { "en": "Trash removed", "es": "Basura retirada" },
+            { "en": "Wall spot cleaning: light marks & scuffs", "es": "Limpieza puntual de paredes: marcas leves y rayones" }
+          ]
+        },
+        {
+          "title": { "en": "Windows", "es": "Ventanas" },
+          "items": [
+            { "en": "Window sills & ledges", "es": "Repisas y salientes de ventana" },
+            { "en": "Accessible window tracks", "es": "Rieles de ventana accesibles" },
+            { "en": "Visible dust around windows", "es": "Polvo visible alrededor de las ventanas" }
+          ]
+        },
+        {
+          "title": { "en": "Bathrooms", "es": "Baños" },
+          "items": [
+            { "en": "Toilet: interior, exterior & base", "es": "Inodoro: interior, exterior y base" },
+            { "en": "Area surrounding the toilet", "es": "Área alrededor del inodoro" },
+            { "en": "Sink, faucet & countertop / vanity", "es": "Lavabo, grifo y encimera / mueble" },
+            { "en": "Shower & tub, walls & fixtures", "es": "Ducha y bañera, paredes y accesorios" },
+            { "en": "Shower glass door & accessible tracks", "es": "Puerta de vidrio de la ducha y rieles accesibles" },
+            { "en": "Mirror", "es": "Espejo" },
+            { "en": "Grout & caulking", "es": "Lechada y sellador" },
+            { "en": "Normal soap residue", "es": "Residuo de jabón normal" },
+            { "en": "Interior of empty vanity cabinets", "es": "Interior de gabinetes del mueble vacíos" },
+            { "en": "Interior of empty drawers", "es": "Interior de cajones vacíos" },
+            { "en": "Baseboards, door frames & doors", "es": "Zócalos, marcos y puertas" },
+            { "en": "Switches & exhaust vent", "es": "Interruptores y rejilla de extracción" },
+            { "en": "Cobwebs", "es": "Telarañas" },
+            { "en": "Corners", "es": "Esquinas" },
+            { "en": "Floor edges", "es": "Bordes del piso" },
+            { "en": "Floors, vacuumed or swept", "es": "Pisos aspirados o barridos" },
+            { "en": "Floors, mopped", "es": "Pisos trapeados" },
+            { "en": "Trash removed", "es": "Basura retirada" }
+          ]
+        },
+        {
+          "title": { "en": "Living areas", "es": "Áreas de estar" },
+          "items": [
+            { "en": "Full dusting: tables, coffee & side tables", "es": "Desempolvado completo: mesas, mesas de centro y auxiliares" },
+            { "en": "Shelves & accessible furniture", "es": "Estantes y muebles accesibles" },
+            { "en": "Baseboards, door frames, doors & handles", "es": "Zócalos, marcos, puertas y manijas" },
+            { "en": "Switches & outlet covers", "es": "Interruptores y tapas de enchufes" },
+            { "en": "Ceiling fans & accessible light fixtures", "es": "Ventiladores de techo y luminarias accesibles" },
+            { "en": "Vents & cobwebs", "es": "Rejillas y telarañas" },
+            { "en": "Window sills, ledges & accessible tracks", "es": "Repisas, salientes y rieles accesibles" },
+            { "en": "Floor edges", "es": "Bordes del piso" },
+            { "en": "Full vacuuming", "es": "Aspirado completo" },
+            { "en": "Mopping of hard floors", "es": "Trapeado de pisos duros" },
+            { "en": "Trash removed", "es": "Basura retirada" }
+          ]
+        },
+        {
+          "title": { "en": "Laundry room", "es": "Cuarto de lavado" },
+          "items": [
+            { "en": "Exterior of washer & dryer", "es": "Exterior de lavadora y secadora" },
+            { "en": "Accessible surfaces", "es": "Superficies accesibles" },
+            { "en": "Baseboards, frames & doors", "es": "Zócalos, marcos y puertas" },
+            { "en": "Switches & vents", "es": "Interruptores y rejillas" },
+            { "en": "Cobwebs", "es": "Telarañas" },
+            { "en": "Floor, vacuumed & mopped", "es": "Piso aspirado y trapeado" }
+          ]
+        },
+        {
+          "title": { "en": "Whole home", "es": "Toda la casa" },
+          "items": [
+            { "en": "Full vacuuming & mopping throughout", "es": "Aspirado y trapeado completos en toda la casa" },
+            { "en": "Trash removed, liners replaced", "es": "Basura retirada, bolsas reemplazadas" },
+            { "en": "Visual review: kitchen, bathrooms & floors", "es": "Revisión visual: cocina, baños y pisos" },
+            { "en": "Visual review: closets & accessible areas", "es": "Revisión visual: closets y áreas accesibles" },
+            { "en": "Final walkthrough", "es": "Recorrido final" },
+            { "en": "Final presentation check: kitchen, bathrooms, floors & empty spaces", "es": "Revisión final de presentación: cocina, baños, pisos y espacios vacíos" }
+          ]
+        }
+      ],
+      "addOns": [],
+      "addOnsNote": {
+        "en": "Add-ons for Move-Out Cleaning are not listed on the source checklist. [OWNER TO PROVIDE: confirm add-ons for Move-Out Cleaning]",
+        "es": "Los complementos para la limpieza de salida no aparecen en la lista de origen. [OWNER TO PROVIDE: confirmar complementos para la limpieza de salida]"
+      },
+      "status": { "en": "pending_approval", "es": "draft" },
       "visible": false
     }
   ]

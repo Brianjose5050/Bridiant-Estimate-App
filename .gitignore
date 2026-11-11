@@ -30,3 +30,8 @@ content/source/**
 .idea/
 .vscode/
 Thumbs.db
+
+# Public app build output and generated preview media (derived from owner source files)
+apps/public/dist/
+apps/public/.astro/
+apps/public/public/preview-media/

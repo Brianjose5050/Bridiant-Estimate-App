@@ -1,0 +1,16 @@
+{
+  "name": "@bridiant/public",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node ../../scripts/prepare-preview-media.mjs && SITE_MODE=preview astro dev",
+    "build:preview": "node ../../scripts/prepare-preview-media.mjs && SITE_MODE=preview astro build && node ../../scripts/check-public-build.mjs preview",
+    "build:production": "rm -rf public/preview-media dist && SITE_MODE=production astro build && node ../../scripts/check-public-build.mjs production",
+    "check:build": "node ../../scripts/check-public-build.mjs"
+  },
+  "dependencies": {
+    "astro": "^5.0.0",
+    "zod": "^3.23.8"
+  }
+}

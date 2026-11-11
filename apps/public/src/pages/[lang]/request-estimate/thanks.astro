@@ -1,0 +1,42 @@
+---
+import Base from '../../../layouts/Base.astro';
+import PageHero from '../../../components/PageHero.astro';
+import { LANGS, pages, ready, text, ui, type Lang } from '../../../lib/site';
+
+export function getStaticPaths() {
+  return LANGS.filter((lang) => ready(lang, ['thanks.title', 'thanks.next', 'thanks.note'])).map((lang) => ({ params: { lang } }));
+}
+const { lang } = Astro.params as { lang: Lang };
+const title = text('thanks.title', lang);
+const next = text('thanks.next', lang);
+const note = text('thanks.note', lang);
+const refLabel = lang === 'en' ? 'Your reference' : 'Su referencia';
+---
+<Base lang={lang} title={`${ui('nav.requestEstimate', lang)} · Bridiant Facility Group`} description={title ?? ''} page={`${pages.request}thanks/`} showMobileBar={false}>
+  <PageHero eyebrow={ui('nav.requestEstimate', lang)} title={title ?? ''} lead={next ?? undefined} />
+  <section class="section" style="padding-top:0">
+    <div class="wrap" style="display:grid;gap:24px;max-width:720px">
+      <div class="status" data-reference-box hidden>
+        <span class="eyebrow" style="margin:0">{refLabel}</span>
+        <strong data-reference style="font-size:1.6rem;letter-spacing:0.04em"></strong>
+        {note && <p>{note}</p>}
+      </div>
+      <p class="help">{lang === 'en' ? 'Photos can be sent by replying to your confirmation email or by calling us.' : 'Puede enviar fotos respondiendo a su correo de confirmación o llamándonos.'}</p>
+      <div class="actions">
+        <a class="btn btn--ghost" href={`/${lang}/services/`}>{ui('nav.services', lang)}</a>
+        <a class="btn btn--ghost" href={`/${lang}/welcome/`}>{ui('nav.welcome', lang)}</a>
+      </div>
+    </div>
+  </section>
+</Base>
+<script>
+  const ref = new URLSearchParams(window.location.search).get('ref');
+  if (ref && /^BFG-[0-9A-Z]{6}$/.test(ref)) {
+    const box = document.querySelector<HTMLElement>('[data-reference-box]');
+    const out = document.querySelector<HTMLElement>('[data-reference]');
+    if (box && out) {
+      out.textContent = ref;
+      box.hidden = false;
+    }
+  }
+</script>

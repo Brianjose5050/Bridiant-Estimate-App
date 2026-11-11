@@ -37,10 +37,17 @@ Apps (`apps/public`, `apps/admin`) are not created yet. They start in Phase 1 an
 
 - **Residential cleaning only.** Commercial, office, medical, retail, and industrial service types are out of scope. The request form offers residential property types only (to be supplied by the owner, S7).
 - **Four services:** Standard Cleaning, Deep Cleaning, Move-In Cleaning, Move-Out Cleaning. Their English names come from the owner. Spanish names are proposals (draft) until a named reviewer approves them.
-- **Seed:** `content/seed/services.json` holds the four services with placeholder descriptions. All four stay hidden until approved.
+- **Seed:** `content/seed/services.json` holds the four services, with descriptions, included tasks, and add-ons transcribed from the owner's checklists (English) and drafted Spanish. All four stay hidden and pending approval.
 - **Source files:** owner-supplied PDFs, images, and business text are organized as listed in `content/source/MANIFEST.md`. Nothing has been received yet.
 
 ## Not part of Phase 0
 
 - The existing estimate app (`index.html.html`, `manifest.json`, `service-worker.js`, `icons/`, `vercel.json.txt.txt`, `README.md`) is untouched.
 - No GitHub push, no Vercel or Cloudflare deployment, no Supabase project, no Google account, no Resend, no Turnstile.
+
+## Public app (apps/public)
+
+- Astro static site, English and Spanish under `/en/` and `/es/`.
+- `npm run build:preview -w @bridiant/public`: review build. Pending content is shown and labelled "Preview · pending owner approval". Local preview photos are generated from `content/source` into `apps/public/public/preview-media` (git-ignored).
+- `npm run build:production -w @bridiant/public`: approved content only. Removes preview media first, then runs `scripts/check-public-build.mjs`, which fails on any pricing identifier or unpublished marker.
+- The public app must never import `packages/pricing`. The build check enforces this.

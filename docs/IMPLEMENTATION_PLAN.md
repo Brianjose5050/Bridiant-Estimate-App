@@ -1,6 +1,6 @@
 # Implementation plan (residential website and owner admin)
 
-**Status:** Phase 0 complete (local). **Phase 1 not started. Awaiting explicit authorization.**
+**Status (local only; nothing deployed, published, pushed, or paid):** Phase 0 complete. Phase 1 public site built in preview and production modes. Pricing, intake, and gallery domain logic built with tests. Admin panel, database, and email delivery not built yet.
 **Baseline:** Architecture Revision 3 (`docs/ARCHITECTURE.md` §19 and §20), plus the scope decisions below. Where they differ, the scope decisions here take precedence.
 
 ## 1. Scope decisions (current)
@@ -69,11 +69,11 @@ Access: owner and editor roles manage the gallery. Reviewers can view. Public ac
 | Phase | Scope | Depends on | Status |
 |---|---|---|---|
 | 0. Foundation | Workspace, palette tokens and lint, bilingual helpers, placeholder and publish gate, placeholder seed, source manifest | Approval B1 | **Complete (local, commit `66abd9a` and later)** |
-| 1. Public site (EN and ES) | Pages for home, about, services (four), our work (gallery display), standards, welcome center shell, legal shell, language switcher, iPhone-first layout, placeholders only | 0 | Not started. **Needs your authorization** |
+| 1. Public site (EN and ES) | Pages for home, about, services (four), our work, standards, welcome center, legal, request form, thanks page, language switcher, iPhone-first layout. Preview and production modes | 0 | **Built locally.** Preview shows pending content; production shows only approved content (currently nothing is approved, so production builds only the 404 page and a redirect) |
 | 2. Data and access | Local database schema, row-level security for owner, editor, reviewer, and public roles, private pricing schema, access tests | 0 | Not started |
-| 3. Content admin and gallery | Owner login with MFA, editors for pages, services, standards, welcome center, documents, and the full photo gallery (§2), draft, preview, publish, rollback | 1, 2 | Not started |
-| 4. Request form and inbox | Residential property questions, conditional questions, form editor, private photo uploads, server intake, durable fallback queue, bilingual emails | 2, 3, decision on fallback store (D2) | Not started |
-| 5. Private pricing engine | Rate rules and versions, discounts, credits, server-side worksheet, customer PDF showing owner-selected lines, audit | 2, 4, owner rates (S11, S12) | Not started |
+| 3. Content admin and gallery | Owner login with MFA, editors, draft, preview, publish, rollback, full photo gallery admin screens (§2). Gallery publish rules and pairing logic are built and tested (packages/gallery) | 1, 2 | **Partly built:** gallery rules and public Before/After display only. Admin UI not built |
+| 4. Request form and inbox | Conditional residential form, draft autosave on device, server validation and store contract (packages/intake, tested), honeypot, idempotency. Durable store, photo upload path, bilingual emails not built | 2, 3, D2 | **Partly built:** form UI and validation. No backend connected; the form reports "not sent" honestly |
+| 5. Private pricing engine | Independent server-side engine (packages/pricing): owner-approved rate versions only, integer cents, owner-controlled customer lines, reconciliation check. No rates exist in the repo. Database storage and admin editor not built | 2, 4, owner rates (S11, S12) | **Engine built and tested.** Not connected to storage |
 | 6. Welcome Center | Three access levels, per-file approval, expiring and revocable packet links | 3, 4, 5, S15 to S19 | Not started |
 | 7. Backups | Encrypted nightly backup, storage copy, restore drill (tested locally first) | 2, Drive approval | Not started |
 | 8. Hardening | Security tests, accessibility, performance, WebKit iPhone tests, leak scans, go-live checklist | 1 to 7 | Not started |
@@ -103,3 +103,10 @@ Dependencies in short: 0, then 1 and 2 in parallel, then 3, then 4 and 5, then 6
 - Modifying or deleting the existing estimate app
 - Pushing to GitHub (blocked by repository access, HTTP 403, and not yet authorized)
 - Deploying or publishing
+
+## 6. Build and verification (current)
+
+- `npm run check`: typecheck, palette lint, 69 unit tests
+- `npm run build:preview -w @bridiant/public`: local review build, pending content visible and labelled
+- `npm run build:production -w @bridiant/public`: build with only approved content; fails if pricing identifiers or unpublished markers appear in output
+- Browser checks run locally: no horizontal overflow at 390 px and 1280 px, no console errors, form conditional questions, draft restore, unavailable state

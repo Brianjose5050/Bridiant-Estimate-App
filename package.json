@@ -8,13 +8,17 @@
     "node": ">=20"
   },
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "apps/*"
   ],
   "scripts": {
     "typecheck": "tsc -b",
     "test": "vitest run",
     "check:palette": "node scripts/palette-check.mjs",
-    "check": "npm run typecheck && npm run check:palette && npm test"
+    "check": "npm run typecheck && npm run check:palette && npm test",
+    "build:preview": "npm run build:preview -w @bridiant/public",
+    "build:production": "npm run build:production -w @bridiant/public",
+    "check:public": "npm run check:build -w @bridiant/public"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

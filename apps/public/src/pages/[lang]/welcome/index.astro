@@ -1,0 +1,41 @@
+---
+import Base from '../../../layouts/Base.astro';
+import PageHero from '../../../components/PageHero.astro';
+import Tag from '../../../components/Tag.astro';
+import { LANGS, MODE, href, pages, ready, text, ui, type Lang } from '../../../lib/site';
+
+export function getStaticPaths() {
+  return LANGS.filter((lang) => ready(lang, ['welcome.intro', 'welcome.packetNote'])).map((lang) => ({ params: { lang } }));
+}
+const { lang } = Astro.params as { lang: Lang };
+const intro = text('welcome.intro', lang);
+const packetNote = text('welcome.packetNote', lang);
+const cards = [
+  { title: ui('nav.services', lang), body: lang === 'en' ? 'What each service includes, room by room.' : 'Qué incluye cada servicio, habitación por habitación.', href: href(lang, pages.services) },
+  { title: ui('nav.standards', lang), body: lang === 'en' ? 'The checklist behind every visit.' : 'La lista de verificación detrás de cada visita.', href: href(lang, pages.standards) },
+  { title: lang === 'en' ? 'Questions and answers' : 'Preguntas y respuestas', body: lang === 'en' ? '[OWNER TO PROVIDE: FAQ content, EN]' : '[OWNER TO PROVIDE: contenido de preguntas frecuentes, ES]', href: null },
+];
+---
+<Base lang={lang} title={`${ui('nav.welcome', lang)} · Bridiant Facility Group`} description={intro ?? ''} page={pages.welcome}>
+  <PageHero eyebrow={lang === 'en' ? 'Customers' : 'Clientes'} title={ui('nav.welcome', lang)} lead={intro ?? undefined} />
+  <section class="section" style="padding-top:0">
+    <div class="wrap" style="display:grid;gap:32px">
+      {MODE === 'preview' && <Tag lang={lang} />}
+      <div class="grid grid--3">
+        {cards.map((card) => card.href ? (
+          <a class="card" href={card.href}>
+            <h3>{card.title}</h3>
+            <p>{card.body}</p>
+            <span class="more">→</span>
+          </a>
+        ) : (
+          <div class="card">
+            <h3>{card.title}</h3>
+            <p>{card.body}</p>
+          </div>
+        ))}
+      </div>
+      {packetNote && <p class="note">{packetNote}</p>}
+    </div>
+  </section>
+</Base>
