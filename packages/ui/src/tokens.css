@@ -1,0 +1,40 @@
+/*
+ * Bridiant design tokens. Must match packages/ui/src/palette.ts (checked by tests).
+ * Only the three brand colors and navy tints are defined. Do not add other hues.
+ */
+:root {
+  --color-navy: #071A2B;
+  --color-white: #FFFFFF;
+  --color-gray: #F1F3F5;
+
+  --color-navy-70: rgba(7, 26, 43, 0.7);
+  --color-navy-40: rgba(7, 26, 43, 0.4);
+  --color-navy-20: rgba(7, 26, 43, 0.2);
+  --color-navy-08: rgba(7, 26, 43, 0.08);
+
+  --focus-ring: 3px solid var(--color-navy);
+  --focus-offset: 2px;
+
+  --font-stack: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  --text-body: 17px;
+  --touch-target: 44px;
+  --input-font-size: 16px;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-white);
+  color: var(--color-navy);
+  font-family: var(--font-stack);
+  font-size: var(--text-body);
+  line-height: 1.5;
+}
+
+:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}

@@ -1,0 +1,79 @@
+{
+  "_note": "Business information is NOT invented. Every value is a placeholder until the owner supplies it and approves it in the admin. Placeholders can never be published.",
+  "schemaVersion": 1,
+  "businessName": {
+    "value": {
+      "en": "[OWNER TO PROVIDE: legal company name and trade name (EN)]",
+      "es": "[OWNER TO PROVIDE: legal company name and trade name (ES)]"
+    },
+    "status": { "en": "draft", "es": "draft" }
+  },
+  "tagline": {
+    "value": {
+      "en": "The Standard, Quietly Kept.",
+      "es": "[OWNER TO PROVIDE: Spanish tagline approval (ES)]"
+    },
+    "status": { "en": "pending_approval", "es": "draft" },
+    "note": "English tagline is from the brand brief and still needs owner approval before publishing."
+  },
+  "phone": {
+    "value": {
+      "en": "[OWNER TO PROVIDE: business phone number (EN)]",
+      "es": "[OWNER TO PROVIDE: business phone number (ES)]"
+    },
+    "status": { "en": "draft", "es": "draft" }
+  },
+  "email": {
+    "value": {
+      "en": "[OWNER TO PROVIDE: business email address (EN)]",
+      "es": "[OWNER TO PROVIDE: business email address (ES)]"
+    },
+    "status": { "en": "draft", "es": "draft" }
+  },
+  "address": {
+    "value": {
+      "en": "[OWNER TO PROVIDE: business mailing address (EN)]",
+      "es": "[OWNER TO PROVIDE: business mailing address (ES)]"
+    },
+    "status": { "en": "draft", "es": "draft" }
+  },
+  "hours": {
+    "value": {
+      "en": "[OWNER TO PROVIDE: business hours (EN)]",
+      "es": "[OWNER TO PROVIDE: business hours (ES)]"
+    },
+    "status": { "en": "draft", "es": "draft" }
+  },
+  "serviceArea": {
+    "value": {
+      "en": "[OWNER TO PROVIDE: service area, ZIP codes or radius, and out-of-area message (EN)]",
+      "es": "[OWNER TO PROVIDE: service area, ZIP codes or radius, and out-of-area message (ES)]"
+    },
+    "status": { "en": "draft", "es": "draft" }
+  },
+  "estimateTurnaround": {
+    "value": {
+      "en": "[OWNER TO PROVIDE: estimate turnaround wording, for example number and unit of time (EN)]",
+      "es": "[OWNER TO PROVIDE: estimate turnaround wording (ES)]"
+    },
+    "status": { "en": "draft", "es": "draft" }
+  },
+  "licenseAndInsurance": {
+    "value": {
+      "en": "[OWNER TO PROVIDE: license and insurance statements, only if true (EN)]",
+      "es": "[OWNER TO PROVIDE: license and insurance statements, only if true (ES)]"
+    },
+    "status": { "en": "draft", "es": "draft" }
+  },
+  "notificationRecipients": {
+    "value": [],
+    "note": "Owner alert recipients. Empty until the owner provides addresses."
+  },
+  "photoLimitPerRequest": {
+    "value": 6,
+    "note": "Proposed default from Revision 3 (D10). Owner decision pending."
+  },
+  "maintenanceMode": {
+    "value": false
+  }
+}

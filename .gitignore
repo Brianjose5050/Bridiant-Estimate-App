@@ -1,0 +1,26 @@
+# Dependencies and build output
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Local environment and secrets (never commit)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.age
+*.dump
+*.dump.age
+
+# Backups and restore drills (never commit)
+backups/
+restore-drill/
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/
+Thumbs.db
