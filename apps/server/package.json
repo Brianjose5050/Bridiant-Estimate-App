@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "@bridiant/intake": "*",
-    "busboy": "^1.6.0"
+    "busboy": "^1.6.0",
+    "@bridiant/gallery": "*"
   },
   "devDependencies": {
     "@types/busboy": "^1.5.4"

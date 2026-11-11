@@ -81,3 +81,14 @@ describe('display names and IP fingerprints', () => {
     expect(hashIp('203.0.113.9', 'other-salt-long-enough')).not.toBe(h);
   });
 });
+
+describe('production configuration safety', () => {
+  it('refuses to start in production without a secret key, salt, and human-verification secret', async () => {
+    const { loadConfig } = await import('../src/config.js');
+    expect(() => loadConfig({ BRIDIANT_ENV: 'production' })).toThrow(/BRIDIANT_SECRET_KEY/);
+    const key = randomBytes(32).toString('base64');
+    expect(() => loadConfig({ BRIDIANT_ENV: 'production', BRIDIANT_SECRET_KEY: key, BRIDIANT_IP_SALT: 'a-long-enough-salt-value' })).toThrow(/TURNSTILE/);
+    const cfg = loadConfig({ BRIDIANT_ENV: 'production', BRIDIANT_SECRET_KEY: key, BRIDIANT_IP_SALT: 'a-long-enough-salt-value', BRIDIANT_TURNSTILE_SECRET: 'x' });
+    expect(cfg.cookieSecure).toBe(true);
+  });
+});

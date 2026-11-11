@@ -7,6 +7,7 @@ import { openDb, type Db } from './db.js';
 import { handleAdmin, sessionCookieName, type AdminCtx } from './admin/routes.js';
 import { handleEstimateSubmit } from './estimates.js';
 import { publicDocumentPath, publicResources, type Lang } from './welcome.js';
+import { publicGallery, publicMediaPath } from './gallery.js';
 
 export interface ServerHandle {
   server: Server;
@@ -159,6 +160,18 @@ export function createApp(cfg: Config, db: Db) {
       if (path === '/api/welcome' && method === 'GET') {
         const lang: Lang = url.searchParams.get('lang') === 'es' ? 'es' : 'en';
         return sendJson(cfg, res, 200, { items: publicResources(db, lang) });
+      }
+      if (path === '/api/gallery' && method === 'GET') {
+        const lang: Lang = url.searchParams.get('lang') === 'es' ? 'es' : 'en';
+        return sendJson(cfg, res, 200, { items: publicGallery(db, lang) });
+      }
+      const media = /^\/api\/gallery\/media\/(\d+)$/.exec(path);
+      if (media && method === 'GET') {
+        const found = publicMediaPath(db, cfg, Number(media[1]));
+        if (!found) return sendJson(cfg, res, 404, { status: 'not_found' });
+        res.writeHead(200, { ...securityHeaders(cfg, 'file'), 'Content-Type': found.mime, 'Cache-Control': 'public, max-age=300' });
+        createReadStream(found.path).on('error', () => res.destroy()).pipe(res);
+        return;
       }
       const doc = /^\/api\/welcome\/documents\/(\d+)$/.exec(path);
       if (doc && method === 'GET') {

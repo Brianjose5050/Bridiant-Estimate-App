@@ -9,6 +9,8 @@ import { parseMultipart, UploadError } from '../estimates.js';
 import { t, KIND_LABELS, TIER_LABELS, FREQUENCY_LABELS, type AdminLang } from './i18n.js';
 import { checkbox, esc, formatDate, homeLabel, label, layout, selectField, serviceNames, statusLabel, statusPill, textField, type LayoutOptions } from './view.js';
 import { audit } from '../db.js';
+import { handleGallery } from './gallery-admin.js';
+import { publicGallery, publicMediaPath } from '../gallery.js';
 
 export interface AdminCtx {
   method: string;
@@ -136,6 +138,11 @@ export async function handleAdmin(ctx: AdminCtx): Promise<AdminResponse> {
 
   const base = { lang, csrf, signedIn: true as const, path, flash: flashFrom(ctx, lang) };
 
+  if (path.startsWith('/admin/gallery')) {
+    const gallery = await handleGallery({ method, path, query: ctx.query, body: ctx.body, cfg, db, req: ctx.req as never }, { lang, csrf, path, username: session.username });
+    if (gallery) return gallery as AdminResponse;
+  }
+
   // ---------- Requests ----------
   if (method === 'GET' && path === '/admin/requests') return requestList(ctx, base);
 
@@ -223,9 +230,6 @@ export async function handleAdmin(ctx: AdminCtx): Promise<AdminResponse> {
     const result = await processOutbox(db, senderFor(cfg));
     audit(db, 'email_queue_processed', 'email_outbox', null, { sent: result.sent, failed: result.failed });
     return redirect('/admin/status?ok=saved');
-  }
-  if (method === 'GET' && path === '/admin/gallery') {
-    return page(ctx, lang, { ...base, activeNav: 'gallery', title: t(lang, 'galleryTitle'), body: `<section class="card"><h1>${esc(t(lang, 'galleryTitle'))}</h1><p class="muted">${esc(t(lang, 'galleryBody'))}</p></section>` });
   }
   if (method === 'GET' && path === '/admin/status') return systemStatus(ctx, base);
 

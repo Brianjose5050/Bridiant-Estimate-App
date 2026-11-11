@@ -1,54 +1,28 @@
 ---
 import Base from '../../../layouts/Base.astro';
-import Compare from '../../../components/Compare.astro';
 import PageHero from '../../../components/PageHero.astro';
-import PhotoGrid from '../../../components/PhotoGrid.astro';
 import Tag from '../../../components/Tag.astro';
-import { buildPublishPlan, type GalleryItem, type GalleryPair } from '../../../../../../packages/gallery/src/gallery';
-import { LANGS, MODE, pages, photos, ready, text, ui, type Lang } from '../../../lib/site';
-import galleryJson from '../../../../../../content/seed/gallery.json';
+import { LANGS, MODE, pages, ready, text, ui, type Lang } from '../../../lib/site';
 
 export function getStaticPaths() {
-  return LANGS.filter((lang) => ready(lang, ['work.intro'])).map((lang) => ({ params: { lang } }));
+  return LANGS.filter((lang) => ready(lang, ['work.intro', 'work.emptyState'])).map((lang) => ({ params: { lang } }));
 }
 
 const { lang } = Astro.params as { lang: Lang };
 const intro = text('work.intro', lang);
-const reviewTitle = text('work.reviewTitle', lang);
-
-// Published comparisons come from the gallery publish plan. Only approved, complete pairs are included.
-const items = galleryJson.items as unknown as GalleryItem[];
-const pairs = galleryJson.pairs as unknown as GalleryPair[];
-const plan = buildPublishPlan(items, pairs);
-const mediaPath = (file: string) => (MODE === 'preview' ? `/preview-media/${file.replace(/\.(png|webp)$/i, '.jpg')}` : `/media/${file}`);
-const fileOf = (item: GalleryItem) => (item as unknown as { file: string }).file;
-const comparisons = plan.filter((unit) => unit.type === 'pair');
-
-// Preview only: owner-supplied photos not yet classified. Production never shows them.
-const queue = photos
-  .filter((p) => !p.deleted)
-  .map((p) => ({ src: `/preview-media/${p.file.replace(/\.(png|webp)$/i, '.jpg')}`, alt: lang === 'en' ? 'Unclassified company photo, pending owner review' : 'Foto de la empresa sin clasificar, pendiente de revisión', caption: null }));
+const emptyState = text('work.emptyState', lang) ?? '';
 ---
 <Base lang={lang} title={`${ui('nav.ourWork', lang)} · Bridiant Facility Group`} description={intro ?? ''} page={pages.work}>
   <PageHero eyebrow={lang === 'en' ? 'Projects' : 'Proyectos'} title={ui('nav.ourWork', lang)} lead={intro ?? undefined} />
   <section class="section" style="padding-top:0">
     <div class="wrap" style="display:grid;gap:32px">
       {MODE === 'preview' && <Tag lang={lang} />}
-      {comparisons.length > 0 && (
-        <div class="grid grid--2">
-          {comparisons.map((unit, i) => unit.type === 'pair' && (
-            <Compare
-              id={`pair-${i + 1}`}
-              before={{ src: mediaPath(fileOf(unit.before)), alt: unit.before.alt[lang] }}
-              after={{ src: mediaPath(fileOf(unit.after)), alt: unit.after.alt[lang] }}
-              labelBefore={lang === 'en' ? 'Before' : 'Antes'}
-              labelAfter={lang === 'en' ? 'After' : 'Después'}
-            />
-          ))}
-        </div>
-      )}
-      {MODE === 'preview' && reviewTitle && <h2 style="font-size:1.4rem">{reviewTitle}</h2>}
-      {MODE === 'preview' && <PhotoGrid items={queue} />}
+      <p class="empty" id="gallery-empty">{emptyState}</p>
+      <div id="gallery-live" data-lang={lang}></div>
     </div>
   </section>
+  <script>
+    import { initGallery } from '../../../client/gallery';
+    initGallery();
+  </script>
 </Base>

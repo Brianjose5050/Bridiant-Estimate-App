@@ -68,6 +68,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, overrides: Part
   const ipSalt = overrides.ipSalt ?? env.BRIDIANT_IP_SALT ?? (mode === 'production' ? '' : 'development-only-salt');
   if (mode === 'production' && ipSalt.length < 16) throw new Error('BRIDIANT_IP_SALT (16+ characters) is required in production.');
 
+  if (mode === 'production' && !env.BRIDIANT_TURNSTILE_SECRET) {
+    throw new Error('BRIDIANT_TURNSTILE_SECRET is required in production (human verification).');
+  }
   return {
     env: mode,
     dataDir,

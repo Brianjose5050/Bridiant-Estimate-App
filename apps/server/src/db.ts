@@ -148,6 +148,57 @@ CREATE TABLE IF NOT EXISTS audit_log (
   detail TEXT,
   created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS gallery_project (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title_en TEXT NOT NULL DEFAULT '',
+  title_es TEXT NOT NULL DEFAULT '',
+  service_id TEXT,
+  approved_en INTEGER NOT NULL DEFAULT 0,
+  approved_es INTEGER NOT NULL DEFAULT 0,
+  visible INTEGER NOT NULL DEFAULT 0,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS gallery_photo (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  display_name TEXT NOT NULL,
+  mime TEXT NOT NULL,
+  bytes INTEGER NOT NULL,
+  sha256 TEXT NOT NULL,
+  storage_name TEXT NOT NULL UNIQUE,
+  kind TEXT NOT NULL DEFAULT 'unclassified' CHECK (kind IN ('unclassified','before','after','regular')),
+  project_id INTEGER REFERENCES gallery_project (id),
+  service_id TEXT,
+  review_status TEXT NOT NULL DEFAULT 'pending' CHECK (review_status IN ('pending','approved','rejected')),
+  ownership_confirmed INTEGER NOT NULL DEFAULT 0,
+  people_status TEXT NOT NULL DEFAULT 'unknown' CHECK (people_status IN ('none_visible','permission_on_file','unknown')),
+  caption_en TEXT NOT NULL DEFAULT '',
+  caption_es TEXT NOT NULL DEFAULT '',
+  alt_en TEXT NOT NULL DEFAULT '',
+  alt_es TEXT NOT NULL DEFAULT '',
+  approved_caption_en INTEGER NOT NULL DEFAULT 0,
+  approved_caption_es INTEGER NOT NULL DEFAULT 0,
+  approved_alt_en INTEGER NOT NULL DEFAULT 0,
+  approved_alt_es INTEGER NOT NULL DEFAULT 0,
+  visible INTEGER NOT NULL DEFAULT 1,
+  deleted_at TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS gallery_pair (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  before_id INTEGER NOT NULL UNIQUE REFERENCES gallery_photo (id),
+  after_id INTEGER NOT NULL UNIQUE REFERENCES gallery_photo (id),
+  project_id INTEGER NOT NULL REFERENCES gallery_project (id),
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  CHECK (before_id <> after_id)
+);
 `;
 
 export function openDb(path: string): Db {

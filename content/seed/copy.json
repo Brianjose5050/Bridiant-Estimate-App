@@ -97,6 +97,14 @@
         "en": "draft",
         "es": "draft"
       }
+    },
+    "emptyState": {
+      "en": "Project photos appear here once they have been reviewed and approved.",
+      "es": "Las fotos de proyectos aparecen aquí cuando han sido revisadas y aprobadas.",
+      "status": {
+        "en": "pending_approval",
+        "es": "draft"
+      }
     }
   },
   "form": {
