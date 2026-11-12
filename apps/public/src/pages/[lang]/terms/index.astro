@@ -1,0 +1,22 @@
+---
+import Base from '../../../layouts/Base.astro';
+import PageHero from '../../../components/PageHero.astro';
+import Tag from '../../../components/Tag.astro';
+import { LANGS, MODE, pages, ready, text, ui, type Lang } from '../../../lib/site';
+
+export function getStaticPaths() {
+  return LANGS.filter((lang) => ready(lang, ['legal.termsBody'])).map((lang) => ({ params: { lang } }));
+}
+const { lang } = Astro.params as { lang: Lang };
+const body = text('legal.termsBody', lang);
+const title = 'terms' === 'privacy' ? (lang === 'en' ? 'Privacy notice' : 'Aviso de privacidad') : (lang === 'en' ? 'Terms' : 'Términos');
+---
+<Base lang={lang} title={`${title} · Bridiant Facility Group`} description={title} page={pages.terms}>
+  <PageHero title={title} />
+  <section class="section" style="padding-top:0">
+    <div class="wrap">
+      {MODE === 'preview' && <Tag lang={lang} />}
+      <div class="prose"><p>{body}</p></div>
+    </div>
+  </section>
+</Base>

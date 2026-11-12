@@ -1,0 +1,10 @@
+---
+import { href, pages, ui, type Lang } from '../lib/site';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+---
+<nav class="mobile-bar" aria-label={lang === 'en' ? 'Quick actions' : 'Acciones rápidas'}>
+  <a class="btn btn--ghost" href="#contact">{lang === 'en' ? 'Contact' : 'Contacto'}</a>
+  <a class="btn btn--primary" href={href(lang, pages.request)}>{ui('nav.requestEstimate', lang)}</a>
+</nav>

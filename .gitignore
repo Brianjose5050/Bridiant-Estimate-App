@@ -1,0 +1,46 @@
+# Dependencies and build output
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Local environment and secrets (never commit)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.age
+*.dump
+*.dump.age
+
+# Backups and restore drills (never commit)
+backups/
+restore-drill/
+
+# Owner source materials (photos, PDFs, logos) stay out of the repository.
+# The repo is public. Only the manifest and folder placeholders are tracked.
+content/source/**
+!content/source/MANIFEST.md
+!content/source/**/.gitkeep
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/
+Thumbs.db
+
+# Public app build output and generated preview media (derived from owner source files)
+apps/public/dist/
+apps/public/.astro/
+apps/public/public/preview-media/
+
+# Local server data: database, private photos, documents, keys. Never commit.
+apps/server/data/
+apps/server/dist/
+
+# Local Workers development variables and emulator state (never commit).
+.dev.vars
+.dev.vars.*
+apps/server/.wrangler/

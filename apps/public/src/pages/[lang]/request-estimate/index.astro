@@ -1,0 +1,20 @@
+---
+import Base from '../../../layouts/Base.astro';
+import EstimateForm from '../../../components/EstimateForm.astro';
+import PageHero from '../../../components/PageHero.astro';
+import { LANGS, pages, ready, text, ui, type Lang } from '../../../lib/site';
+
+export function getStaticPaths() {
+  return LANGS.filter((lang) => ready(lang, ['form.intro', 'form.consent'])).map((lang) => ({ params: { lang } }));
+}
+const { lang } = Astro.params as { lang: Lang };
+const intro = text('form.intro', lang);
+---
+<Base lang={lang} title={`${ui('nav.requestEstimate', lang)} · Bridiant Facility Group`} description={intro ?? ''} page={pages.request}>
+  <PageHero eyebrow={lang === 'en' ? 'Residential estimate' : 'Estimado residencial'} title={ui('nav.requestEstimate', lang)} />
+  <section class="section" style="padding-top:0">
+    <div class="wrap">
+      <EstimateForm lang={lang} />
+    </div>
+  </section>
+</Base>

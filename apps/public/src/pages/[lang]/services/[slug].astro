@@ -1,0 +1,65 @@
+---
+import Base from '../../../layouts/Base.astro';
+import ChecklistGroups from '../../../components/ChecklistGroups.astro';
+import Tag from '../../../components/Tag.astro';
+import { LANGS, MODE, href, pages, services, servicesReady, ui, type Lang, type Service, addOnsIntro } from '../../../lib/site';
+
+export function getStaticPaths() {
+  const paths = [];
+  for (const lang of LANGS) {
+    if (!servicesReady(lang)) continue;
+    for (const service of services) {
+      paths.push({ params: { lang, slug: service.slug[lang] }, props: { service } });
+    }
+  }
+  return paths;
+}
+
+const { lang } = Astro.params as { lang: Lang };
+const { service } = Astro.props as { service: Service };
+const count = service.includedGroups.reduce((n, g) => n + g.items.length, 0);
+const pagePath = `services/${service.slug[lang]}/`;
+const label = service.name[lang];
+---
+<Base lang={lang} title={`${label} · Bridiant Facility Group`} description={service.summary[lang]} page={pagePath} altPage={`services/${service.slug[lang === 'en' ? 'es' : 'en']}/`}>
+  <section class="section" style="padding-bottom:48px">
+    <div class="wrap">
+      <div class="service-head">
+        <div style="display:grid;gap:14px">
+          {MODE === 'preview' && <Tag lang={lang} />}
+          <span class="eyebrow">{count} {lang === 'en' ? 'included tasks' : 'tareas incluidas'}</span>
+          <h1>{label}</h1>
+          <p class="lead">{service.tagline[lang]}</p>
+        </div>
+        <p class="prose" style="max-width:66ch;font-size:1.05rem">{service.summary[lang]}</p>
+        {service.note && <p class="note">{service.note[lang]}</p>}
+      </div>
+
+      <h2 style="margin-bottom:28px">{lang === 'en' ? 'What is included' : 'Qué incluye'}</h2>
+      <ChecklistGroups service={service} lang={lang} />
+    </div>
+  </section>
+
+  <section class="section section--gray">
+    <div class="wrap grid grid--2" style="gap:40px;align-items:start">
+      <div style="display:grid;gap:16px">
+        <h2>{lang === 'en' ? 'Available as add-ons' : 'Disponibles como complementos'}</h2>
+        {service.addOns.length > 0 ? (
+          <>
+            <p class="lead" style="font-size:1rem">{addOnsIntro[lang]}</p>
+            <ul class="chips">
+              {service.addOns.map((addOn) => <li>{addOn[lang]}</li>)}
+            </ul>
+          </>
+        ) : (
+          MODE === 'preview' && <Tag lang={lang} />
+        )}
+      </div>
+      <div style="display:grid;gap:16px;justify-items:start">
+        <h2>{lang === 'en' ? `Request an estimate for ${label}` : `Solicite un estimado para ${label}`}</h2>
+        <p class="lead" style="font-size:1rem">{lang === 'en' ? 'Tell us about your home. We review every request personally.' : 'Cuéntenos sobre su hogar. Revisamos cada solicitud personalmente.'}</p>
+        <a class="btn btn--primary" href={`${href(lang, pages.request)}?service=${service.id}`}>{ui('nav.requestEstimate', lang)}</a>
+      </div>
+    </div>
+  </section>
+</Base>

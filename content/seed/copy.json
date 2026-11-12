@@ -1,0 +1,298 @@
+{
+  "_note": "Site copy. Items marked pending_approval or draft are shown only in preview mode. Business facts stay as [OWNER TO PROVIDE] placeholders until the owner supplies them. Spanish entries are drafts until a named reviewer approves them.",
+  "schemaVersion": 1,
+  "home": {
+    "headline": {
+      "en": "The Standard, Quietly Kept.",
+      "es": "El estándar, cuidado en silencio.",
+      "status": {
+        "en": "pending_approval",
+        "es": "draft"
+      }
+    },
+    "lead": {
+      "en": "Residential cleaning, planned room by room.",
+      "es": "Limpieza residencial, planificada habitación por habitación.",
+      "status": {
+        "en": "pending_approval",
+        "es": "draft"
+      }
+    },
+    "howTitle": {
+      "en": "How your estimate works",
+      "es": "Cómo funciona su estimado",
+      "status": {
+        "en": "pending_approval",
+        "es": "draft"
+      }
+    },
+    "steps": [
+      {
+        "en": "Tell us about your home. The form takes about two minutes.",
+        "es": "Cuéntenos sobre su hogar. El formulario toma unos dos minutos.",
+        "status": {
+          "en": "pending_approval",
+          "es": "draft"
+        }
+      },
+      {
+        "en": "We review your request personally.",
+        "es": "Revisamos su solicitud personalmente.",
+        "status": {
+          "en": "pending_approval",
+          "es": "draft"
+        }
+      },
+      {
+        "en": "You receive your estimate from us, with each service explained.",
+        "es": "Usted recibe su estimado de nuestra parte, con cada servicio explicado.",
+        "status": {
+          "en": "pending_approval",
+          "es": "draft"
+        }
+      }
+    ]
+  },
+  "servicesIntro": {
+    "en": "Four residential services. Each one is listed room by room, so you know what is included.",
+    "es": "Cuatro servicios residenciales. Cada uno aparece habitación por habitación, para que sepa qué incluye.",
+    "status": {
+      "en": "pending_approval",
+      "es": "draft"
+    }
+  },
+  "about": {
+    "body": {
+      "en": "[OWNER TO PROVIDE: About Us text, EN]",
+      "es": "[OWNER TO PROVIDE: texto de Nosotros, ES]",
+      "status": {
+        "en": "draft",
+        "es": "draft"
+      }
+    }
+  },
+  "standards": {
+    "intro": {
+      "en": "Every service is listed room by room, so the standard is visible before the visit.",
+      "es": "Cada servicio aparece habitación por habitación, para que el estándar sea visible antes de la visita.",
+      "status": {
+        "en": "pending_approval",
+        "es": "draft"
+      }
+    }
+  },
+  "work": {
+    "intro": {
+      "en": "Our work, shown before and after where we have permission to share it.",
+      "es": "Nuestro trabajo, mostrado antes y después cuando tenemos permiso para compartirlo.",
+      "status": {
+        "en": "pending_approval",
+        "es": "draft"
+      }
+    },
+    "reviewTitle": {
+      "en": "Owner review queue (preview only)",
+      "es": "Cola de revisión del propietario (solo vista previa)",
+      "status": {
+        "en": "draft",
+        "es": "draft"
+      }
+    },
+    "emptyState": {
+      "en": "Project photos appear here once they have been reviewed and approved.",
+      "es": "Las fotos de proyectos aparecen aquí cuando han sido revisadas y aprobadas.",
+      "status": {
+        "en": "pending_approval",
+        "es": "draft"
+      }
+    }
+  },
+  "form": {
+    "intro": {
+      "en": "A few questions, about two minutes. We review every request personally. This is a request for an estimate, not a booking.",
+      "es": "Algunas preguntas, unos dos minutos. Revisamos cada solicitud personalmente. Esta es una solicitud de estimado, no una reservación.",
+      "status": {
+        "en": "pending_approval",
+        "es": "draft"
+      }
+    },
+    "photosHelp": {
+      "en": "Optional. Photos help us understand the home. You can add as many as you like.",
+      "es": "Opcional. Las fotos nos ayudan a entender el hogar. Puede agregar todas las que quiera.",
+      "status": {
+        "en": "pending_approval",
+        "es": "draft"
+      }
+    },
+    "consent": {
+      "en": "[OWNER TO PROVIDE: consent text, EN]",
+      "es": "[OWNER TO PROVIDE: texto de consentimiento, ES]",
+      "status": {
+        "en": "draft",
+        "es": "draft"
+      }
+    }
+  },
+  "thanks": {
+    "title": {
+      "en": "Thank you. We received your request.",
+      "es": "Gracias. Recibimos su solicitud.",
+      "status": {
+        "en": "pending_approval",
+        "es": "draft"
+      }
+    },
+    "next": {
+      "en": "We will contact you within [OWNER TO PROVIDE: turnaround time, EN].",
+      "es": "Le contactaremos en [OWNER TO PROVIDE: tiempo de respuesta, ES].",
+      "status": {
+        "en": "draft",
+        "es": "draft"
+      }
+    },
+    "note": {
+      "en": "This is a request for an estimate, not a booking.",
+      "es": "Esta es una solicitud de estimado, no una reservación.",
+      "status": {
+        "en": "pending_approval",
+        "es": "draft"
+      }
+    },
+    "welcomeTitle": {
+      "en": "Welcome to Bridiant",
+      "es": "Bienvenido a Bridiant",
+      "status": {
+        "en": "pending_approval",
+        "es": "draft"
+      }
+    },
+    "welcomeLead": {
+      "en": "Your Welcome Center holds everything you need to prepare for your first visit, and what to expect after it.",
+      "es": "Su Centro de bienvenida reúne todo lo que necesita para preparar su primera visita y lo que puede esperar después.",
+      "status": {
+        "en": "pending_approval",
+        "es": "draft"
+      }
+    },
+    "welcomeCta": {
+      "en": "Explore Your Welcome Center",
+      "es": "Explore su Centro de bienvenida",
+      "status": {
+        "en": "pending_approval",
+        "es": "draft"
+      }
+    }
+  },
+  "welcome": {
+    "intro": {
+      "en": "Everything you need before and after your first visit.",
+      "es": "Todo lo que necesita antes y después de su primera visita.",
+      "status": {
+        "en": "pending_approval",
+        "es": "draft"
+      }
+    },
+    "packetNote": {
+      "en": "Your welcome packet is shared after your estimate is approved.",
+      "es": "Su paquete de bienvenida se comparte después de aprobar su estimado.",
+      "status": {
+        "en": "pending_approval",
+        "es": "draft"
+      }
+    },
+    "heroTitle": {
+      "en": "Welcome to Bridiant",
+      "es": "Bienvenido a Bridiant",
+      "status": {
+        "en": "pending_approval",
+        "es": "draft"
+      }
+    },
+    "heroLead": {
+      "en": "Everything you need to know before and after your first visit, in one place.",
+      "es": "Todo lo que necesita saber antes y después de su primera visita, en un solo lugar.",
+      "status": {
+        "en": "pending_approval",
+        "es": "draft"
+      }
+    },
+    "chaptersTitle": {
+      "en": "Explore the chapters",
+      "es": "Explore los capítulos",
+      "status": {
+        "en": "pending_approval",
+        "es": "draft"
+      }
+    },
+    "noChapters": {
+      "en": "Your welcome chapters will appear here once they have been approved.",
+      "es": "Sus capítulos de bienvenida aparecerán aquí cuando sean aprobados.",
+      "status": {
+        "en": "draft",
+        "es": "draft"
+      }
+    }
+  },
+  "footer": {
+    "tagline": {
+      "en": "The Standard, Quietly Kept.",
+      "es": "El estándar, cuidado en silencio.",
+      "status": {
+        "en": "pending_approval",
+        "es": "draft"
+      }
+    }
+  },
+  "contact": {
+    "phone": {
+      "en": "[OWNER TO PROVIDE: phone]",
+      "es": "[OWNER TO PROVIDE: teléfono]",
+      "status": {
+        "en": "draft",
+        "es": "draft"
+      }
+    },
+    "email": {
+      "en": "[OWNER TO PROVIDE: email]",
+      "es": "[OWNER TO PROVIDE: correo]",
+      "status": {
+        "en": "draft",
+        "es": "draft"
+      }
+    },
+    "hours": {
+      "en": "[OWNER TO PROVIDE: hours]",
+      "es": "[OWNER TO PROVIDE: horario]",
+      "status": {
+        "en": "draft",
+        "es": "draft"
+      }
+    },
+    "serviceArea": {
+      "en": "[OWNER TO PROVIDE: service area]",
+      "es": "[OWNER TO PROVIDE: zona de servicio]",
+      "status": {
+        "en": "draft",
+        "es": "draft"
+      }
+    }
+  },
+  "legal": {
+    "privacyBody": {
+      "en": "[OWNER TO PROVIDE: privacy notice, EN]",
+      "es": "[OWNER TO PROVIDE: aviso de privacidad, ES]",
+      "status": {
+        "en": "draft",
+        "es": "draft"
+      }
+    },
+    "termsBody": {
+      "en": "[OWNER TO PROVIDE: terms, EN]",
+      "es": "[OWNER TO PROVIDE: términos, ES]",
+      "status": {
+        "en": "draft",
+        "es": "draft"
+      }
+    }
+  }
+}

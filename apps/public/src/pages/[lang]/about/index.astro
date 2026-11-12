@@ -1,0 +1,21 @@
+---
+import Base from '../../../layouts/Base.astro';
+import Tag from '../../../components/Tag.astro';
+import PageHero from '../../../components/PageHero.astro';
+import { LANGS, MODE, copyItem, pages, ready, text, ui, type Lang } from '../../../lib/site';
+
+export function getStaticPaths() {
+  return LANGS.filter((lang) => ready(lang, ['about.body'])).map((lang) => ({ params: { lang } }));
+}
+const { lang } = Astro.params as { lang: Lang };
+const body = text('about.body', lang);
+---
+<Base lang={lang} title={`${ui('nav.about', lang)} · Bridiant Facility Group`} description={body ?? ''} page={pages.about}>
+  <PageHero eyebrow="Bridiant Facility Group" title={ui('nav.about', lang)} />
+  <section class="section" style="padding-top:0">
+    <div class="wrap">
+      {MODE === 'preview' && <Tag lang={lang} />}
+      <div class="prose"><p>{body}</p></div>
+    </div>
+  </section>
+</Base>

@@ -1,0 +1,26 @@
+---
+/**
+ * Before/After comparison. Works without JavaScript showing the After image;
+ * the slider needs a few lines of script. Photos must be owner-approved before use.
+ */
+interface Side { src: string; alt: string }
+interface Props { before: Side; after: Side; labelBefore: string; labelAfter: string; id: string }
+const { before, after, labelBefore, labelAfter, id } = Astro.props;
+---
+<figure class="compare" data-compare={id} style="margin:0">
+  <img src={before.src} alt={before.alt} loading="lazy" decoding="async" />
+  <img class="after" src={after.src} alt={after.alt} loading="lazy" decoding="async" />
+  <span class="handle" aria-hidden="true"></span>
+  <span class="label before">{labelBefore}</span>
+  <span class="label after">{labelAfter}</span>
+  <input type="range" min="0" max="100" value="50" aria-label={labelBefore + ' / ' + labelAfter} />
+</figure>
+<script>
+  document.querySelectorAll<HTMLElement>('[data-compare]').forEach((figure) => {
+    const input = figure.querySelector<HTMLInputElement>('input[type="range"]');
+    if (!input) return;
+    const update = () => figure.style.setProperty('--pos', `${input.value}%`);
+    input.addEventListener('input', update);
+    update();
+  });
+</script>

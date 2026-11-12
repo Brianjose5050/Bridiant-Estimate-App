@@ -1,0 +1,45 @@
+---
+import Base from '../../../layouts/Base.astro';
+import Tag from '../../../components/Tag.astro';
+import { LANGS, MODE, pages, ready, text, ui, type Lang } from '../../../lib/site';
+
+export function getStaticPaths() {
+  return LANGS.filter((lang) => ready(lang, ['welcome.heroTitle', 'welcome.heroLead'])).map((lang) => ({ params: { lang } }));
+}
+
+const { lang } = Astro.params as { lang: Lang };
+const heroTitle = text('welcome.heroTitle', lang) ?? '';
+const heroLead = text('welcome.heroLead', lang) ?? '';
+const chaptersTitle = text('welcome.chaptersTitle', lang) ?? '';
+const noChapters = text('welcome.noChapters', lang) ?? '';
+const eyebrow = lang === 'en' ? 'Welcome Packet' : 'Paquete de bienvenida';
+const openDoc = lang === 'en' ? 'Open document (PDF)' : 'Abrir documento (PDF)';
+---
+<Base lang={lang} title={`${heroTitle} · Bridiant Facility Group`} description={heroLead} page={pages.welcome}>
+  <section class="section section--navy wc-hero">
+    <div class="wrap">
+      {MODE === 'preview' && <Tag lang={lang} />}
+      <span class="eyebrow reveal">{eyebrow}</span>
+      <h1 class="serif reveal reveal--delay-1">{heroTitle}</h1>
+      <p class="lead reveal reveal--delay-2">{heroLead}</p>
+    </div>
+  </section>
+
+  <section class="wc-index" aria-label={chaptersTitle}>
+    <div class="wrap">
+      <nav class="wc-chips" id="wc-chips" aria-label={chaptersTitle} hidden></nav>
+    </div>
+  </section>
+
+  <section class="section wc-body">
+    <div class="wrap">
+      <p class="muted" id="wc-status">{noChapters}</p>
+      <div id="wc-chapters" class="wc-chapters" data-lang={lang} data-open-doc={openDoc}></div>
+    </div>
+  </section>
+
+  <script>
+    import { initWelcome } from '../../../client/welcome';
+    initWelcome();
+  </script>
+</Base>

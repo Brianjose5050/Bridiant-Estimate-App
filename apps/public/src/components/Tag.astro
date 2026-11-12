@@ -1,0 +1,6 @@
+---
+import type { Lang } from '../lib/site';
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+---
+<span class="tag">{lang === 'en' ? 'Preview · pending owner approval' : 'Vista previa · pendiente de aprobación'}</span>

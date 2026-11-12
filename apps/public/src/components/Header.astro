@@ -1,0 +1,52 @@
+---
+import { href, pages, ui, type Lang } from '../lib/site';
+
+interface Props {
+  lang: Lang;
+  page: string;
+  otherLang: Lang;
+  altPage: string;
+}
+const { lang, page, otherLang, altPage } = Astro.props;
+
+const items: { key: 'nav.home' | 'nav.services' | 'nav.ourWork' | 'nav.standards' | 'nav.welcome' | 'nav.about' | 'nav.requestEstimate'; path: string }[] = [
+  { key: 'nav.services', path: pages.services },
+  { key: 'nav.ourWork', path: pages.work },
+  { key: 'nav.standards', path: pages.standards },
+  { key: 'nav.welcome', path: pages.welcome },
+  { key: 'nav.about', path: pages.about },
+];
+const current = (path: string) => (page === path || (path !== '' && page.startsWith(path)) ? 'page' : undefined);
+---
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href={href(lang, pages.home)} aria-label="Bridiant Facility Group">
+      Bridiant <span>Facility Group</span>
+    </a>
+
+    <nav class="nav-main" aria-label={lang === 'en' ? 'Main' : 'Principal'}>
+      {items.map((item) => (
+        <a href={href(lang, item.path)} aria-current={current(item.path)}>{ui(item.key, lang)}</a>
+      ))}
+    </nav>
+
+    <div style="display:flex;align-items:center;gap:12px">
+      <nav class="lang" aria-label={ui('lang.switcherLabel', lang)}>
+        <a href={href(lang, page)} aria-current="true" lang={lang}>{lang === 'en' ? 'EN' : 'ES'}</a>
+        <span aria-hidden="true">|</span>
+        <a href={href(otherLang, altPage)} aria-current="false" lang={otherLang}>{otherLang === 'en' ? 'EN' : 'ES'}</a>
+      </nav>
+
+      <details class="menu">
+        <summary>{lang === 'en' ? 'Menu' : 'Menú'}</summary>
+        <nav class="menu-panel" aria-label={lang === 'en' ? 'Menu' : 'Menú'}>
+          <a href={href(lang, pages.home)}>{ui('nav.home', lang)}</a>
+          {items.map((item) => (
+            <a href={href(lang, item.path)} aria-current={current(item.path)}>{ui(item.key, lang)}</a>
+          ))}
+          <a href={href(lang, pages.request)} aria-current={current(pages.request)}>{ui('nav.requestEstimate', lang)}</a>
+        </nav>
+      </details>
+    </div>
+  </div>
+</header>

@@ -1,0 +1,28 @@
+---
+import Base from '../../../layouts/Base.astro';
+import ChecklistGroups from '../../../components/ChecklistGroups.astro';
+import PageHero from '../../../components/PageHero.astro';
+import { LANGS, pages, ready, services, servicesReady, text, ui, type Lang } from '../../../lib/site';
+
+export function getStaticPaths() {
+  return LANGS.filter((lang) => ready(lang, ['standards.intro']) && servicesReady(lang)).map((lang) => ({ params: { lang } }));
+}
+const { lang } = Astro.params as { lang: Lang };
+const intro = text('standards.intro', lang);
+---
+<Base lang={lang} title={`${ui('nav.standards', lang)} · Bridiant Facility Group`} description={intro ?? ''} page={pages.standards}>
+  <PageHero eyebrow={lang === 'en' ? 'Our standard' : 'Nuestro estándar'} title={ui('nav.standards', lang)} lead={intro ?? undefined} />
+  <section class="section" style="padding-top:0">
+    <div class="wrap stack">
+      {services.map((service, i) => (
+        <details class="service-details" open={i === 0}>
+          <summary>{service.name[lang]}</summary>
+          <div style="padding-top:12px">
+            <p class="lead" style="font-size:1rem;margin-bottom:28px">{service.tagline[lang]}</p>
+            <ChecklistGroups service={service} lang={lang} />
+          </div>
+        </details>
+      ))}
+    </div>
+  </section>
+</Base>

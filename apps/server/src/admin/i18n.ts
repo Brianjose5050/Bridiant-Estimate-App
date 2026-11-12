@@ -1,0 +1,166 @@
+/**
+ * Panel wording, English and Spanish. The panel is for the owner only, so these strings are
+ * working labels, not customer-facing copy. They do not need the customer approval workflow.
+ */
+export type AdminLang = 'en' | 'es';
+
+const T = {
+  appName: { en: 'Bridiant · Private panel', es: 'Bridiant · Panel privado' },
+  navRequests: { en: 'Requests', es: 'Solicitudes' },
+  navWelcome: { en: 'Welcome Center', es: 'Centro de bienvenida' },
+  navGallery: { en: 'Gallery', es: 'Galería' },
+  navStatus: { en: 'System', es: 'Sistema' },
+  logout: { en: 'Sign out', es: 'Cerrar sesión' },
+  login: { en: 'Sign in', es: 'Iniciar sesión' },
+  loginTitle: { en: 'Private panel', es: 'Panel privado' },
+  loginHelp: { en: 'Enter your password and the 6-digit code from your authenticator app.', es: 'Escriba su contraseña y el código de 6 dígitos de su aplicación de autenticación.' },
+  username: { en: 'Username', es: 'Usuario' },
+  password: { en: 'Password', es: 'Contraseña' },
+  code: { en: 'Authenticator code', es: 'Código de autenticación' },
+  loginFailed: { en: 'The sign-in details are not correct, or the code has expired.', es: 'Los datos de acceso no son correctos, o el código ha caducado.' },
+  sessionEnded: { en: 'Your session ended. Please sign in again.', es: 'Su sesión terminó. Inicie sesión de nuevo.' },
+  forbidden: { en: 'This action could not be verified. Reload the page and try again.', es: 'No se pudo verificar la acción. Recargue la página e intente de nuevo.' },
+  notFound: { en: 'Not found.', es: 'No encontrado.' },
+  serverError: { en: 'Something went wrong. Nothing was changed.', es: 'Algo salió mal. No se cambió nada.' },
+  dashboard: { en: 'Overview', es: 'Resumen' },
+  newRequests: { en: 'New requests', es: 'Solicitudes nuevas' },
+  totalRequests: { en: 'All requests', es: 'Todas las solicitudes' },
+  emailNotConfigured: { en: 'Owner alert email is not configured yet. Requests are still saved.', es: 'El correo de aviso al propietario aún no está configurado. Las solicitudes se guardan igual.' },
+  search: { en: 'Name, email, or service', es: 'Nombre, correo o servicio' },
+  statusFilter: { en: 'Status', es: 'Estado' },
+  all: { en: 'All', es: 'Todos' },
+  from: { en: 'From', es: 'Desde' },
+  to: { en: 'To', es: 'Hasta' },
+  apply: { en: 'Filter', es: 'Filtrar' },
+  clear: { en: 'Clear', es: 'Limpiar' },
+  noRequests: { en: 'No requests match these filters.', es: 'Ninguna solicitud coincide con estos filtros.' },
+  received: { en: 'Received', es: 'Recibida' },
+  unreviewed: { en: 'Not yet opened', es: 'Sin abrir' },
+  service: { en: 'Service', es: 'Servicio' },
+  contact: { en: 'Contact', es: 'Contacto' },
+  name: { en: 'Name', es: 'Nombre' },
+  phone: { en: 'Phone', es: 'Teléfono' },
+  email: { en: 'Email', es: 'Correo' },
+  zip: { en: 'ZIP code', es: 'Código postal' },
+  answers: { en: 'Form answers', es: 'Respuestas del formulario' },
+  homeType: { en: 'Home type', es: 'Tipo de vivienda' },
+  bedrooms: { en: 'Bedrooms', es: 'Habitaciones' },
+  bathrooms: { en: 'Bathrooms', es: 'Baños' },
+  frequency: { en: 'Frequency', es: 'Frecuencia' },
+  moveDate: { en: 'Move date', es: 'Fecha de mudanza' },
+  notes: { en: 'Customer notes', es: 'Notas del cliente' },
+  consent: { en: 'Consent recorded', es: 'Consentimiento registrado' },
+  photos: { en: 'Photos', es: 'Fotos' },
+  noPhotos: { en: 'No photos attached.', es: 'No se adjuntaron fotos.' },
+  photoNote: { en: 'Photos are private. Only the signed-in owner can open them.', es: 'Las fotos son privadas. Solo el propietario con sesión iniciada puede abrirlas.' },
+  statusLabel: { en: 'Status', es: 'Estado' },
+  changeStatus: { en: 'Change status', es: 'Cambiar estado' },
+  internalNotes: { en: 'Internal notes', es: 'Notas internas' },
+  internalNotesHelp: { en: 'Visible only in this panel. Never shown to customers.', es: 'Visibles solo en este panel. Nunca se muestran al cliente.' },
+  addNote: { en: 'Add note', es: 'Agregar nota' },
+  noNotes: { en: 'No notes yet.', es: 'Todavía no hay notas.' },
+  history: { en: 'History', es: 'Historial' },
+  noteAdded: { en: 'Note added', es: 'Nota agregada' },
+  statusChanged: { en: 'Status changed', es: 'Estado cambiado' },
+  receivedEvent: { en: 'Request received', es: 'Solicitud recibida' },
+  saved: { en: 'Saved.', es: 'Guardado.' },
+  noteEmpty: { en: 'Write a note before saving.', es: 'Escriba una nota antes de guardar.' },
+  back: { en: 'Back to requests', es: 'Volver a solicitudes' },
+  resources: { en: 'Welcome Center resources', es: 'Recursos del Centro de bienvenida' },
+  newResource: { en: 'New resource', es: 'Nuevo recurso' },
+  edit: { en: 'Edit', es: 'Editar' },
+  titleEn: { en: 'Title (English)', es: 'Título (inglés)' },
+  titleEs: { en: 'Title (Spanish)', es: 'Título (español)' },
+  subtitleEn: { en: 'Subtitle (English)', es: 'Subtítulo (inglés)' },
+  subtitleEs: { en: 'Subtitle (Spanish)', es: 'Subtítulo (español)' },
+  bodyFormatHelp: { en: 'Format: "# Heading" starts a heading, "- item" starts a list, "Label | text" makes a labelled line, a blank line separates blocks, and "*" at the start makes an italic line. HTML is not accepted.', es: 'Formato: "# Título" crea un encabezado, "- elemento" crea una lista, "Etiqueta | texto" crea una línea con etiqueta, una línea en blanco separa bloques y "*" al inicio crea una línea en cursiva. No se acepta HTML.' },
+  bodyEn: { en: 'Text (English)', es: 'Texto (inglés)' },
+  bodyEs: { en: 'Text (Spanish)', es: 'Texto (español)' },
+  kind: { en: 'Type', es: 'Tipo' },
+  tier: { en: 'Access', es: 'Acceso' },
+  sortOrder: { en: 'Order', es: 'Orden' },
+  approvedEn: { en: 'Approved in English', es: 'Aprobado en inglés' },
+  approvedEs: { en: 'Approved in Spanish', es: 'Aprobado en español' },
+  publishedLabel: { en: 'Published', es: 'Publicado' },
+  document: { en: 'PDF document', es: 'Documento PDF' },
+  uploadDocument: { en: 'Upload PDF', es: 'Subir PDF' },
+  currentDocument: { en: 'Current document', es: 'Documento actual' },
+  noDocument: { en: 'No document uploaded.', es: 'No hay documento cargado.' },
+  saveResource: { en: 'Save', es: 'Guardar' },
+  resourceHelp: { en: 'Changing English or Spanish text removes that language’s approval. Approve it again after review.', es: 'Si cambia el texto en inglés o en español, esa versión pierde su aprobación. Apruébela de nuevo tras revisarla.' },
+  sendQueue: { en: 'Send queued messages', es: 'Enviar mensajes en cola' },
+  retryFailed: { en: 'Retry failed messages', es: 'Reintentar mensajes fallidos' },
+  publishNeedsApproval: { en: 'Approve at least one language before publishing.', es: 'Apruebe al menos un idioma antes de publicar.' },
+  tierPending: { en: 'Private links for this access level are not connected yet.', es: 'Los enlaces privados para este nivel de acceso aún no están conectados.' },
+  galleryTitle: { en: 'Gallery management', es: 'Gestión de galería' },
+  galleryBody: { en: 'Photo classification, pairing, and approval are not connected to this panel yet. Current items stay private until approved.', es: 'La clasificación, la asignación en pares y la aprobación de fotos aún no están conectadas a este panel. Las fotos actuales permanecen privadas hasta su aprobación.' },
+  statusTitle: { en: 'System status', es: 'Estado del sistema' },
+  mailStatus: { en: 'Email queue', es: 'Cola de correo' },
+  mailQueued: { en: 'Queued', es: 'En cola' },
+  mailSent: { en: 'Sent', es: 'Enviados' },
+  mailFailed: { en: 'Failed', es: 'Fallidos' },
+  mailSkipped: { en: 'Waiting for configuration', es: 'Esperando configuración' },
+  configured: { en: 'Configured', es: 'Configurado' },
+  notConfigured: { en: 'Not configured', es: 'No configurado' },
+  ownerEmailRow: { en: 'Owner alert address', es: 'Correo de aviso al propietario' },
+  providerRow: { en: 'Email provider', es: 'Proveedor de correo' },
+  adminLinkRow: { en: 'Private panel address (for alerts)', es: 'Dirección del panel (para avisos)' },
+  turnstileRow: { en: 'Human check (Turnstile)', es: 'Verificación humana (Turnstile)' },
+  setLanguage: { en: 'Español', es: 'English' },
+  pageOf: { en: 'Page', es: 'Página' },
+  prev: { en: 'Previous', es: 'Anterior' },
+  next: { en: 'Next', es: 'Siguiente' },
+} as const;
+
+export type TKey = keyof typeof T;
+
+export function t(lang: AdminLang, key: TKey): string {
+  return T[key][lang];
+}
+
+export const STATUS_LABELS: Record<string, Record<AdminLang, string>> = {
+  new: { en: 'New', es: 'Nueva' },
+  under_review: { en: 'Under Review', es: 'En revisión' },
+  contacted: { en: 'Contacted', es: 'Contactado' },
+  estimate_sent: { en: 'Estimate Sent', es: 'Estimado enviado' },
+  booked: { en: 'Booked', es: 'Agendado' },
+  completed: { en: 'Completed', es: 'Completado' },
+  cancelled: { en: 'Cancelled', es: 'Cancelado' },
+};
+
+export const HOME_LABELS: Record<string, Record<AdminLang, string>> = {
+  house: { en: 'House', es: 'Casa' },
+  apartment: { en: 'Apartment or condo', es: 'Apartamento o condominio' },
+  townhouse: { en: 'Townhouse', es: 'Casa adosada' },
+  other: { en: 'Other', es: 'Otro' },
+};
+
+export const SERVICE_LABELS: Record<string, Record<AdminLang, string>> = {
+  'standard-cleaning': { en: 'Standard Cleaning', es: 'Limpieza estándar' },
+  'deep-cleaning': { en: 'Deep Cleaning', es: 'Limpieza profunda' },
+  'move-in-cleaning': { en: 'Move-In Cleaning', es: 'Limpieza de entrada' },
+  'move-out-cleaning': { en: 'Move-Out Cleaning', es: 'Limpieza de salida' },
+};
+
+export const FREQUENCY_LABELS: Record<string, Record<AdminLang, string>> = {
+  'one-time': { en: 'One time', es: 'Una vez' },
+  weekly: { en: 'Weekly', es: 'Semanal' },
+  biweekly: { en: 'Every two weeks', es: 'Cada dos semanas' },
+  monthly: { en: 'Monthly', es: 'Mensual' },
+};
+
+export const KIND_LABELS: Record<string, Record<AdminLang, string>> = {
+  presentation: { en: 'Welcome presentation', es: 'Presentación de bienvenida' },
+  service_info: { en: 'Service information', es: 'Información de servicios' },
+  standards: { en: 'Cleaning standards', es: 'Estándares de limpieza' },
+  preparation: { en: 'Preparing your property', es: 'Preparar la propiedad' },
+  policy: { en: 'Policy or instructions', es: 'Política o instrucciones' },
+  document: { en: 'Document', es: 'Documento' },
+  faq: { en: 'Questions and answers', es: 'Preguntas y respuestas' },
+};
+
+export const TIER_LABELS: Record<string, Record<AdminLang, string>> = {
+  public: { en: 'Public', es: 'Público' },
+  after_request: { en: 'After request', es: 'Después de solicitar' },
+  after_approval: { en: 'After approval (private link)', es: 'Después de aprobación (enlace privado)' },
+};

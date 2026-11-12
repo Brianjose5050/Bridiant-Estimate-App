@@ -1,0 +1,48 @@
+---
+import '../styles/global.css';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import MobileBar from '../components/MobileBar.astro';
+import type { Lang } from '../lib/site';
+
+interface Props {
+  lang: Lang;
+  title: string;
+  description: string;
+  /** Page path after the language prefix, for example 'services/'. */
+  page: string;
+  /** Path for the other language, when slugs differ. Defaults to the same path. */
+  altPage?: string;
+  noindex?: boolean;
+  showMobileBar?: boolean;
+}
+
+const { lang, title, description, page, altPage, noindex = false, showMobileBar = true } = Astro.props;
+const other: Lang = lang === 'en' ? 'es' : 'en';
+const altSuffix = altPage ?? page;
+---
+<!doctype html>
+<html lang={lang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#071A2B" />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="alternate" hreflang="en" href={`/en/${lang === 'en' ? page : altSuffix}`} />
+    <link rel="alternate" hreflang="es" href={`/es/${lang === 'es' ? page : altSuffix}`} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+  </head>
+  <body class:list={[showMobileBar && 'has-mobile-bar']}>
+    <a class="skip" href="#main">{lang === 'en' ? 'Skip to content' : 'Ir al contenido'}</a>
+    <Header lang={lang} page={page} otherLang={other} altPage={altSuffix} />
+    <main id="main">
+      <slot />
+    </main>
+    <Footer lang={lang} />
+    {showMobileBar && <MobileBar lang={lang} />}
+  </body>
+</html>

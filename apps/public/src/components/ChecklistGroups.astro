@@ -1,0 +1,15 @@
+---
+import type { Lang, Service } from '../lib/site';
+interface Props { service: Service; lang: Lang }
+const { service, lang } = Astro.props;
+---
+<div class="checklist-groups">
+  {service.includedGroups.map((group) => (
+    <section class="checklist" aria-labelledby={`${service.id}-${group.title.en.replace(/\W+/g, '-').toLowerCase()}`}>
+      <h3 id={`${service.id}-${group.title.en.replace(/\W+/g, '-').toLowerCase()}`}>{group.title[lang]}</h3>
+      <ul>
+        {group.items.map((item) => <li>{item[lang]}</li>)}
+      </ul>
+    </section>
+  ))}
+</div>

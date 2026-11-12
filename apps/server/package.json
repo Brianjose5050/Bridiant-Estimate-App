@@ -1,0 +1,22 @@
+{
+  "name": "@bridiant/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Server: estimate intake, private owner panel, Welcome Center API. Runs on Cloudflare Workers; local Node adapter for development.",
+  "main": "./dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "admin:create": "node dist/cli/create-admin.js",
+    "seed:welcome": "node dist/cli/seed-welcome.js",
+    "d1:init-remote": "node dist/cli/d1-init-remote.js"
+  },
+  "dependencies": {
+    "@bridiant/gallery": "*",
+    "@bridiant/intake": "*"
+  },
+  "devDependencies": {
+    "wrangler": "^4.160.1"
+  }
+}

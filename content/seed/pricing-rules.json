@@ -1,0 +1,8 @@
+{
+  "_note": "PRIVATE. This file is a development seed only. It must never be copied into a public build, bundle, or API response. Pricing is empty by design: the owner enters and approves every rate, discount, and credit in the admin. No values are invented here.",
+  "schemaVersion": 1,
+  "rateVersion": null,
+  "rules": [],
+  "discounts": [],
+  "credits": []
+}
